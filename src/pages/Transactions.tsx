@@ -58,7 +58,7 @@ export default function Transactions() {
 
     return (
         <div className="flex flex-col gap-6 max-w-lg mx-auto pb-24 px-4 pt-4">
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3">
                 <button
                     onClick={() => window.history.back()}
                     className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-gray-600 shadow-sm hover:bg-gray-50 transition-colors border border-gray-100"
@@ -66,7 +66,7 @@ export default function Transactions() {
                     <i className="pi pi-arrow-left"></i>
                 </button>
                 <h2 className="text-2xl font-bold text-[#001f3f] m-0">All Transactions</h2>
-            </div>
+            </div> */}
 
             <div className="flex flex-col gap-0 backdrop-blur-sm">
                 {assets.map((item) => (

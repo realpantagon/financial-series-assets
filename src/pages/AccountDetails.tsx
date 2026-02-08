@@ -119,7 +119,16 @@ export default function AccountDetails() {
 
             {/* Transactions List */}
             <div className="flex flex-col gap-3">
-                <h3 className="text-lg font-bold text-gray-800 px-2">Transactions</h3>
+                <div className="flex justify-between items-center px-2">
+                    <h3 className="text-lg font-bold text-gray-800">Transactions</h3>
+                    <button
+                        onClick={() => navigate('/add', { state: { accountName } })}
+                        className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors"
+                    >
+                        <i className="pi pi-plus text-[10px]"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
 
                 <div className="flex flex-col gap-0 backdrop-blur-sm">
                     {assets.map((item) => (
