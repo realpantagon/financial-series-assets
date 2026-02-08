@@ -4,6 +4,7 @@ import AddTransaction from './pages/AddTransaction';
 import AccountDetails from './pages/AccountDetails';
 import Transactions from './pages/Transactions';
 import FXPage from './pages/FXPage';
+import FXAnalytics from './pages/FXAnalytics';
 import './App.css';
 
 function NavItem({ to, label, icon }: { to: string, label: string, icon: string }) {
@@ -58,9 +59,9 @@ function BottomNav() {
 function Header() {
     return (
         <div className="bg-surface-ground sticky top-0 z-40">
-            <div className="max-w-lg mx-auto px-6 py-2 flex justify-between items-center">
+            {/* <div className="max-w-lg mx-auto px-6 py-2 flex justify-between items-center">
                 <span className="text-2xl font-bold text-[#001f3f]">Pantagon Assets</span>
-            </div>
+            </div> */}
         </div>
     )
 }
@@ -76,6 +77,7 @@ function App() {
                         <Route path="/add" element={<AddTransaction />} />
                         <Route path="/transactions" element={<Transactions />} />
                         <Route path="/fx" element={<FXPage />} />
+                        <Route path="/fx/analytics" element={<FXAnalytics />} />
                         <Route path="/account/:accountName" element={<AccountDetails />} />
                     </Routes>
                 </div>

@@ -1,5 +1,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { PantagonUSD } from '../types';
 
@@ -9,6 +10,7 @@ const MONTHS = [
 ];
 
 export default function FXPage() {
+    const navigate = useNavigate();
     const [data, setData] = useState<PantagonUSD[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -82,8 +84,6 @@ export default function FXPage() {
     const analytics = useMemo(() => {
         let totalThbIn = 0;
         let totalThbOut = 0;
-        let totalRate = 0;
-        let count = 0;
 
         filteredData.forEach(item => {
             // THB In/Out Logic
@@ -93,16 +93,21 @@ export default function FXPage() {
                 totalThbOut += item.thb_amount;
             }
 
-            // Rate Average
-            totalRate += item.exchange_rate;
-            count++;
+            // Rate Average - switch to Weighted Average
+            // We need to sum up total THB and total Foreign for the filtered set
+            // We can do this by accumulating here
         });
+
+        // Weighted Average Calculation
+        const totalThbVolume = filteredData.reduce((acc, item) => acc + Number(item.thb_amount || 0), 0);
+        const totalForeignVolume = filteredData.reduce((acc, item) => acc + Number(item.foreign_amount || 0), 0);
+        const weightedAvgRate = totalForeignVolume > 0 ? totalThbVolume / totalForeignVolume : 0;
 
         return {
             totalThbIn,
             totalThbOut,
-            avgRate: count > 0 ? totalRate / count : 0,
-            count
+            avgRate: weightedAvgRate,
+            count: filteredData.length
         };
     }, [filteredData]);
 
@@ -129,7 +134,15 @@ export default function FXPage() {
 
     return (
         <div className="p-4 pb-24 max-w-lg mx-auto">
-            <h1 className="text-2xl font-bold mb-4 text-[#001f3f]">FX Transactions</h1>
+            <div className="flex justify-between items-center mb-4">
+                <h1 className="text-2xl font-bold text-[#001f3f]">FX Transactions</h1>
+                <button
+                    onClick={() => navigate('/fx/analytics')}
+                    className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1"
+                >
+                    <i className="pi pi-chart-bar"></i> Analytics
+                </button>
+            </div>
 
             {/* Top Controls: Year & Month Nav */}
             <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-lg shadow-sm border border-gray-100">
@@ -207,7 +220,7 @@ export default function FXPage() {
                     filteredData.map((item) => (
                         <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all hover:shadow-md relative overflow-hidden group">
                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${item.to_currency === 'USD' ? 'bg-green-500' :
-                                    item.from_currency === 'USD' ? 'bg-red-500' : 'bg-gray-300'
+                                item.from_currency === 'USD' ? 'bg-red-500' : 'bg-gray-300'
                                 }`}></div>
 
                             <div className="flex justify-between items-start mb-2 pl-2">
