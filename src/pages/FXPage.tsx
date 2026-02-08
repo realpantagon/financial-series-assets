@@ -18,7 +18,6 @@ export default function FXPage() {
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
     const [selectedFromCurrency, setSelectedFromCurrency] = useState<string>('All');
     const [selectedToCurrency, setSelectedToCurrency] = useState<string>('All');
-    const [selectedType, setSelectedType] = useState<string>('All');
 
     useEffect(() => {
         fetchData();
@@ -72,13 +71,12 @@ export default function FXPage() {
             const date = new Date(item.transaction_at);
             const matchYear = date.getFullYear() === selectedYear;
             const matchMonth = date.getMonth() === selectedMonth;
-            const matchType = selectedType === 'All' || item.type === selectedType;
             const matchFrom = selectedFromCurrency === 'All' || item.from_currency === selectedFromCurrency;
             const matchTo = selectedToCurrency === 'All' || item.to_currency === selectedToCurrency;
 
-            return matchYear && matchMonth && matchType && matchFrom && matchTo;
+            return matchYear && matchMonth && matchFrom && matchTo;
         });
-    }, [data, selectedYear, selectedMonth, selectedType, selectedFromCurrency, selectedToCurrency]);
+    }, [data, selectedYear, selectedMonth, selectedFromCurrency, selectedToCurrency]);
 
     // Analytics Calculation
     const analytics = useMemo(() => {
@@ -157,17 +155,7 @@ export default function FXPage() {
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-                <select
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
-                    className="bg-white border border-gray-200 text-gray-700 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 shadow-sm"
-                >
-                    <option value="All">Type: All</option>
-                    <option value="USD">USD</option>
-                    <option value="FCD">FCD</option>
-                    <option value="SAVE">SAVE</option>
-                </select>
+            <div className="grid grid-cols-2 gap-2 mb-4">
                 <select
                     value={selectedFromCurrency}
                     onChange={(e) => setSelectedFromCurrency(e.target.value)}
@@ -231,13 +219,6 @@ export default function FXPage() {
                                         {new Date(item.transaction_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </div>
                                 </div>
-                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${item.type === 'USD' ? 'bg-blue-100 text-blue-700' :
-                                        item.type === 'FCD' ? 'bg-purple-100 text-purple-700' :
-                                            item.type === 'SAVE' ? 'bg-amber-100 text-amber-700' :
-                                                'bg-gray-100 text-gray-600'
-                                    }`}>
-                                    {item.type || 'N/A'}
-                                </span>
                             </div>
 
                             <div className="flex justify-between items-end pl-2">

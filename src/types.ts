@@ -18,6 +18,5 @@ export interface PantagonUSD {
   transaction_at: string;
   from_currency: string;
   to_currency: string;
-  type?: 'USD' | 'FCD' | 'SAVE';
   created_at?: string;
 }
