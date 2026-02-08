@@ -134,15 +134,9 @@ export default function Dashboard() {
             </div>
 
             {/* Chart Section */}
-            {chartData && (
-                <div className="w-full flex justify-center py-4 relative h-64">
-                    <Doughnut data={chartData} options={chartOptions} />
-                    {/* Center Text Overlay */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-xs text-gray-400 font-medium">Distribution</span>
-                    </div>
-                </div>
-            )}
+
+            
+            
 
             {/* Assets List */}
             <div className="flex flex-col gap-4">

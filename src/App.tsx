@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import AddTransaction from './pages/AddTransaction';
 import AccountDetails from './pages/AccountDetails';
 import Transactions from './pages/Transactions';
+import FXPage from './pages/FXPage';
 import './App.css';
 
 function NavItem({ to, label, icon }: { to: string, label: string, icon: string }) {
@@ -47,6 +48,7 @@ function BottomNav() {
                     </div>
 
                     <NavItem to="/transactions" label="Transactions" icon="pi pi-list" />
+                    <NavItem to="/fx" label="FX" icon="pi pi-dollar" />
                 </div>
             </div>
         </div>
@@ -73,6 +75,7 @@ function App() {
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/add" element={<AddTransaction />} />
                         <Route path="/transactions" element={<Transactions />} />
+                        <Route path="/fx" element={<FXPage />} />
                         <Route path="/account/:accountName" element={<AccountDetails />} />
                     </Routes>
                 </div>
