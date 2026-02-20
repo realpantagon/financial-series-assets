@@ -54,11 +54,11 @@ function todayISO(): string {
 const JSON_TEMPLATE_BUY = {
     side: "BUY",
     symbol: "AAPL",
-    transaction_date: "2026-02-20T10:30",
-    executed_price: "220.50",
-    input_amount_usd: "1000.00",
-    commission: "0.99",
-    vat: null,
+    transaction_date: "2026-02-20T10:30:00Z",
+    executed_price: 220.50,
+    input_amount_usd: 1000.00,
+    commission: 0.99,
+    vat: 0.0065,
     fee: null,
     sec_fee: null,
     taf_fee: null
@@ -67,11 +67,11 @@ const JSON_TEMPLATE_BUY = {
 const JSON_TEMPLATE_SELL = {
     side: "SELL",
     symbol: "AAPL",
-    transaction_date: "2026-02-20T10:30",
-    executed_price: "220.50",
-    input_shares: "4.53515",
-    commission: "0.99",
-    vat: null,
+    transaction_date: "2026-02-20T10:30:00Z",
+    executed_price: 220.50,
+    input_shares: 4.53515,
+    commission: 0.99,
+    vat: 0.0065,
     fee: null,
     sec_fee: null,
     taf_fee: null
