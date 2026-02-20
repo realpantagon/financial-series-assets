@@ -29,7 +29,8 @@ interface SymbolSummary {
     totalShares: number;
     avgBuyPrice: number;
     txCount: number;
-    latestDate: string; // ISO date of most recent transaction
+    latestDate: string;
+    totalStockAmount: number; // net stock_amount (buy stock - sell stock)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -108,6 +109,9 @@ export default function DimeStock() {
     const [jsonInput, setJsonInput] = useState('');
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [jsonSuccess, setJsonSuccess] = useState(false);
+    const [batchPreview, setBatchPreview] = useState<any[] | null>(null);
+    const [batchSaving, setBatchSaving] = useState(false);
+    const [batchError, setBatchError] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<'transactions' | 'summary'>('transactions');
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -140,7 +144,7 @@ export default function DimeStock() {
         transactions.forEach((tx) => {
             const sym = tx.symbol || 'UNKNOWN';
             if (!map[sym]) {
-                map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date };
+                map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0 };
             }
             map[sym].txCount++;
             // Track the latest date
@@ -150,9 +154,11 @@ export default function DimeStock() {
             if (tx.side === 'BUY') {
                 map[sym].totalBuyAmount += Number(tx.total_amount);
                 map[sym].totalShares += Number(tx.shares ?? 0);
+                map[sym].totalStockAmount += Number(tx.stock_amount ?? 0);
             } else {
                 map[sym].totalSellAmount += Number(tx.total_amount);
                 map[sym].totalShares -= Number(tx.shares ?? 0);
+                map[sym].totalStockAmount -= Number(tx.stock_amount ?? 0);
             }
         });
         // Compute avg buy price
@@ -162,12 +168,17 @@ export default function DimeStock() {
                 s.avgBuyPrice = buys.reduce((acc, t) => acc + Number(t.executed_price), 0) / buys.length;
             }
         });
-        return Object.values(map).sort((a, b) => b.latestDate.localeCompare(a.latestDate));
+        return Object.values(map).sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
     }, [transactions]);
 
     const overallBuy = useMemo(() => transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
     const overallSell = useMemo(() => transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
     const netPL = overallSell - overallBuy;
+    // Total net stock value = sum of stock_amount (BUY) - sum of stock_amount (SELL)
+    const currentStockValue = useMemo(() =>
+        transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0) -
+        transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0)
+        , [transactions]);
 
     // ── Save transaction ───────────────────────────────────────────────────────
 
@@ -200,15 +211,18 @@ export default function DimeStock() {
 
         if (form.side === 'BUY') {
             input_amount_usd = parseFloat(form.input_amount_usd);
-            shares = input_amount_usd / execPrice;
             const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
-            total_amount = input_amount_usd + totalFees;
+            // input_amount_usd is the TOTAL spend (fees already included)
+            // stock_amount = money going to actual stock purchase (after fees deducted)
+            const stockAmt = input_amount_usd - totalFees;
+            shares = stockAmt / execPrice;
+            total_amount = input_amount_usd; // total money out of pocket
         } else {
             input_shares = parseFloat(form.input_shares);
             shares = input_shares;
             const stockAmount = input_shares * execPrice;
             const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
-            total_amount = stockAmount - totalFees;
+            total_amount = stockAmount - totalFees; // net proceeds after fees
         }
 
         const payload = {
@@ -225,7 +239,10 @@ export default function DimeStock() {
             taf_fee,
             input_amount_usd: form.side === 'BUY' ? input_amount_usd : null,
             input_shares: form.side === 'SELL' ? input_shares : null,
-            stock_amount: shares ? shares * execPrice : null,
+            // stock_amount = actual stock purchase value (excluding fees)
+            stock_amount: form.side === 'BUY'
+                ? (input_amount_usd! - ((commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0)))
+                : (shares! * execPrice),
             currency: 'USD',
         };
 
@@ -256,42 +273,137 @@ export default function DimeStock() {
         }
     };
 
+    // ── Build DB payload (shared by single + batch save) ───────────────────────
+
+    const buildPayload = (p: any) => {
+        const execPrice = Number(p.executed_price);
+        // Always store fees as positive (OCR may return negatives for SELL)
+        const commission = p.commission != null ? Math.abs(Number(p.commission)) : null;
+        const vat = p.vat != null ? Math.abs(Number(p.vat)) : null;
+        const fee = p.fee != null ? Math.abs(Number(p.fee)) : null;
+        const sec_fee = p.sec_fee != null ? Math.abs(Number(p.sec_fee)) : null;
+        const taf_fee = p.taf_fee != null ? Math.abs(Number(p.taf_fee)) : null;
+        const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
+
+        let shares: number | null = null;
+        let total_amount: number;
+        let input_amount_usd: number | null = null;
+        let input_shares: number | null = null;
+        let stock_amount: number | null = null;
+
+        if (p.side === 'BUY') {
+            input_amount_usd = Number(p.input_amount_usd);
+            stock_amount = input_amount_usd - totalFees;
+            shares = stock_amount / execPrice;
+            total_amount = input_amount_usd;
+        } else {
+            input_shares = Number(p.input_shares);
+            shares = input_shares;
+            stock_amount = input_shares * execPrice;
+            total_amount = stock_amount - totalFees;
+        }
+
+        return {
+            side: p.side,
+            transaction_date: new Date(p.transaction_date).toISOString(),
+            symbol: String(p.symbol).toUpperCase().trim(),
+            shares,
+            total_amount,
+            executed_price: execPrice,
+            commission,
+            vat,
+            fee: fee === 0 ? null : fee,
+            sec_fee: sec_fee === 0 ? null : sec_fee,
+            taf_fee: taf_fee === 0 ? null : taf_fee,
+            input_amount_usd: p.side === 'BUY' ? input_amount_usd : null,
+            input_shares: p.side === 'SELL' ? input_shares : null,
+            stock_amount,
+            currency: 'USD',
+        };
+    };
+
     // ── JSON Auto-fill ─────────────────────────────────────────────────────────
 
     const applyJson = () => {
         setJsonError(null);
         setJsonSuccess(false);
+        setBatchPreview(null);
+        setBatchError(null);
         try {
-            const parsed = JSON.parse(jsonInput);
-            const newForm: FormState = { ...form };
+            let raw = jsonInput.trim();
+            // Strip markdown fences
+            raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 
-            if (parsed.side === 'BUY' || parsed.side === 'SELL') newForm.side = parsed.side;
-            if (parsed.symbol) newForm.symbol = String(parsed.symbol).toUpperCase().trim();
-            if (parsed.transaction_date) {
-                // Accept ISO string or YYYY-MM-DDTHH:mm format
-                const d = new Date(parsed.transaction_date);
-                if (!isNaN(d.getTime())) {
-                    newForm.transaction_date = d.toISOString().slice(0, 16);
-                }
+            // Try array first
+            const arrMatch = raw.match(/\[[\s\S]*\]/);
+            const objMatch = raw.match(/\{[\s\S]*\}/);
+
+            if (arrMatch) {
+                const arr = JSON.parse(arrMatch[0]);
+                if (!Array.isArray(arr) || arr.length === 0) throw new Error('Empty array');
+                // Validate each item minimally
+                arr.forEach((item: any, i: number) => {
+                    if (!item.side || !item.symbol || !item.executed_price || !item.transaction_date)
+                        throw new Error(`Item ${i + 1} missing required fields (side, symbol, executed_price, transaction_date)`);
+                    if (item.side === 'BUY' && item.input_amount_usd == null)
+                        throw new Error(`Item ${i + 1}: BUY requires input_amount_usd`);
+                    if (item.side === 'SELL' && item.input_shares == null)
+                        throw new Error(`Item ${i + 1}: SELL requires input_shares`);
+                });
+                setBatchPreview(arr);
+                return;
             }
-            if (parsed.executed_price != null) newForm.executed_price = String(parsed.executed_price);
-            if (parsed.input_amount_usd != null) newForm.input_amount_usd = String(parsed.input_amount_usd);
-            if (parsed.input_shares != null) newForm.input_shares = String(parsed.input_shares);
-            if (parsed.commission != null) newForm.commission = String(parsed.commission);
-            if (parsed.vat != null) newForm.vat = String(parsed.vat);
-            if (parsed.fee != null) newForm.fee = String(parsed.fee);
-            if (parsed.sec_fee != null) newForm.sec_fee = String(parsed.sec_fee);
-            if (parsed.taf_fee != null) newForm.taf_fee = String(parsed.taf_fee);
 
-            setForm(newForm);
-            setJsonSuccess(true);
+            if (objMatch) {
+                const parsed = JSON.parse(objMatch[0]);
+                const newForm: FormState = { ...form };
+                if (parsed.side === 'BUY' || parsed.side === 'SELL') newForm.side = parsed.side;
+                if (parsed.symbol) newForm.symbol = String(parsed.symbol).toUpperCase().trim();
+                if (parsed.transaction_date) {
+                    const d = new Date(parsed.transaction_date);
+                    if (!isNaN(d.getTime())) newForm.transaction_date = d.toISOString().slice(0, 16);
+                }
+                if (parsed.executed_price != null) newForm.executed_price = String(Math.abs(Number(parsed.executed_price)));
+                if (parsed.input_amount_usd != null) newForm.input_amount_usd = String(parsed.input_amount_usd);
+                if (parsed.input_shares != null) newForm.input_shares = String(parsed.input_shares);
+                if (parsed.commission != null) newForm.commission = String(Math.abs(Number(parsed.commission)));
+                if (parsed.vat != null) newForm.vat = String(Math.abs(Number(parsed.vat)));
+                if (parsed.fee != null) newForm.fee = String(Math.abs(Number(parsed.fee)));
+                if (parsed.sec_fee != null) newForm.sec_fee = String(Math.abs(Number(parsed.sec_fee)));
+                if (parsed.taf_fee != null) newForm.taf_fee = String(Math.abs(Number(parsed.taf_fee)));
+                setForm(newForm);
+                setJsonSuccess(true);
+                setJsonInput('');
+                setTimeout(() => { setShowJsonPanel(false); setJsonSuccess(false); }, 1200);
+                return;
+            }
+
+            throw new Error('No JSON found');
+        } catch (e: any) {
+            setJsonError(e.message || 'Could not parse JSON — check the format.');
+        }
+    };
+
+    // ── Batch Save ─────────────────────────────────────────────────────────────
+
+    const handleBatchSave = async () => {
+        if (!batchPreview) return;
+        setBatchError(null);
+        setBatchSaving(true);
+        try {
+            const payloads = batchPreview.map(buildPayload);
+            const { error } = await supabase.from('dime_transactions').insert(payloads);
+            if (error) throw error;
+            setBatchPreview(null);
             setJsonInput('');
-            setTimeout(() => {
-                setShowJsonPanel(false);
-                setJsonSuccess(false);
-            }, 1200);
-        } catch {
-            setJsonError('Invalid JSON — please check the format and try again.');
+            setShowJsonPanel(false);
+            setJsonSuccess(true);
+            setTimeout(() => setJsonSuccess(false), 2000);
+            await fetchTransactions();
+        } catch (err: any) {
+            setBatchError(err.message);
+        } finally {
+            setBatchSaving(false);
         }
     };
 
@@ -327,6 +439,15 @@ export default function DimeStock() {
                 </button>
             </div>
 
+            {/* Portfolio Value — full-width hero card */}
+            <div className="bg-[#001f3f] rounded-2xl p-4 text-white flex justify-between items-center">
+                <div>
+                    <p className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider mb-0.5">Stock in Portfolio</p>
+                    <p className="text-2xl font-bold">{formatUSD(currentStockValue)}</p>
+                    <p className="text-[10px] text-blue-400 mt-0.5">{symbolSummaries.filter(s => s.totalShares > 0).length} symbols held</p>
+                </div>
+                <i className="pi pi-chart-line text-3xl text-blue-400 opacity-60" />
+            </div>
             {/* ── Overview Cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-3 gap-2">
                 <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
@@ -404,11 +525,13 @@ export default function DimeStock() {
 
                                 {/* Paste area */}
                                 <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Paste OCR JSON here</label>
+                                    <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">
+                                        Paste OCR JSON here — single object OR array
+                                    </label>
                                     <textarea
                                         value={jsonInput}
-                                        onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); setJsonSuccess(false); }}
-                                        placeholder={`{\n  "side": "${form.side}",\n  "symbol": "AAPL",\n  ...\n}`}
+                                        onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); setBatchPreview(null); setJsonSuccess(false); }}
+                                        placeholder={`{ ... }  or  [ { ... }, { ... } ]`}
                                         rows={5}
                                         className="border border-amber-200 bg-white rounded-lg px-3 py-2 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
                                     />
@@ -417,21 +540,71 @@ export default function DimeStock() {
                                 {jsonError && (
                                     <p className="text-[11px] text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">{jsonError}</p>
                                 )}
-                                {jsonSuccess && (
+                                {jsonSuccess && !batchPreview && (
                                     <p className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
                                         <i className="pi pi-check-circle" /> Fields filled successfully!
                                     </p>
                                 )}
 
-                                <button
-                                    type="button"
-                                    onClick={applyJson}
-                                    disabled={!jsonInput.trim()}
-                                    className="w-full py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <i className="pi pi-bolt mr-1.5" />
-                                    Apply JSON to Form
-                                </button>
+                                {/* Batch preview */}
+                                {batchPreview && (
+                                    <div className="flex flex-col gap-2">
+                                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                                            {batchPreview.length} transactions ready to import:
+                                        </p>
+                                        <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                                            {batchPreview.map((item, i) => (
+                                                <div key={i} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-2.5 py-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.side === 'BUY' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                                            }`}>{item.side}</span>
+                                                        <span className="text-xs font-bold text-[#001f3f]">{String(item.symbol).toUpperCase()}</span>
+                                                        <span className="text-[10px] text-gray-400">
+                                                            {item.side === 'BUY'
+                                                                ? `$${Number(item.input_amount_usd).toFixed(2)}`
+                                                                : `${Number(item.input_shares)} sh`}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400">@${Number(item.executed_price).toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {batchError && (
+                                            <p className="text-[11px] text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">{batchError}</p>
+                                        )}
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBatchPreview(null)}
+                                                className="flex-1 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleBatchSave}
+                                                disabled={batchSaving}
+                                                className="flex-1 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm disabled:opacity-50"
+                                            >
+                                                {batchSaving
+                                                    ? <><i className="pi pi-spin pi-spinner mr-1" />Saving...</>
+                                                    : <><i className="pi pi-cloud-upload mr-1" />Import All {batchPreview.length}</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!batchPreview && (
+                                    <button
+                                        type="button"
+                                        onClick={applyJson}
+                                        disabled={!jsonInput.trim()}
+                                        className="w-full py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <i className="pi pi-bolt mr-1.5" />
+                                        Apply JSON to Form
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -605,21 +778,28 @@ export default function DimeStock() {
                                     </div>
 
                                     {/* Detail row */}
-                                    <div className="flex justify-between items-end text-sm">
+                                    <div className="flex justify-between items-start text-sm mt-1">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-xs text-gray-500">
-                                                {tx.shares != null ? `${Number(tx.shares).toFixed(6)} shares` : '—'} @ {formatUSD(tx.executed_price)}
+                                                {tx.shares != null ? `${Number(tx.shares).toFixed(6)} sh` : '—'} @ {formatUSD(tx.executed_price)}
                                             </span>
-                                            {(tx.commission || tx.vat || tx.fee || tx.sec_fee || tx.taf_fee) && (
-                                                <span className="text-[10px] text-gray-400">
-                                                    Fees: {formatUSD(
-                                                        (Number(tx.commission ?? 0)) +
-                                                        (Number(tx.vat ?? 0)) +
-                                                        (Number(tx.fee ?? 0)) +
-                                                        (Number(tx.sec_fee ?? 0)) +
-                                                        (Number(tx.taf_fee ?? 0))
-                                                    )}
-                                                </span>
+                                            {tx.stock_amount != null && (
+                                                <span className="text-[10px] text-gray-400">Stock: {formatUSD(tx.stock_amount)}</span>
+                                            )}
+                                            {Number(tx.commission) > 0 && (
+                                                <span className="text-[10px] text-gray-400">Commission: {formatUSD(tx.commission)}</span>
+                                            )}
+                                            {Number(tx.vat) > 0 && (
+                                                <span className="text-[10px] text-gray-400">VAT: {formatUSD(tx.vat)}</span>
+                                            )}
+                                            {Number(tx.fee) > 0 && (
+                                                <span className="text-[10px] text-gray-400">Fee: {formatUSD(tx.fee)}</span>
+                                            )}
+                                            {Number(tx.sec_fee) > 0 && (
+                                                <span className="text-[10px] text-gray-400">SEC Fee: {formatUSD(tx.sec_fee)}</span>
+                                            )}
+                                            {Number(tx.taf_fee) > 0 && (
+                                                <span className="text-[10px] text-gray-400">TAF Fee: {formatUSD(tx.taf_fee)}</span>
                                             )}
                                         </div>
                                         <span className="font-bold text-gray-900 text-base">{formatUSD(tx.total_amount)}</span>
@@ -698,9 +878,15 @@ export default function DimeStock() {
                                             </div>
                                         </div>
                                         {s.totalShares > 0 && (
-                                            <p className="text-[10px] text-blue-300 mt-2">
-                                                Holding ≈ {s.totalShares.toFixed(6)} shares
-                                            </p>
+                                            <div className="mt-2 bg-white/10 rounded-xl p-2.5 flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-[10px] text-blue-300 font-semibold mb-0.5">Stock in Portfolio</p>
+                                                    <p className="font-bold text-sm">{formatUSD(s.totalStockAmount)}</p>
+                                                </div>
+                                                <p className="text-[10px] text-blue-300">
+                                                    {s.totalShares.toFixed(6)} shares
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
 
@@ -730,21 +916,28 @@ export default function DimeStock() {
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-between items-end">
+                                                <div className="flex justify-between items-start">
                                                     <div className="flex flex-col gap-0.5">
                                                         <span className="text-xs text-gray-500">
-                                                            {tx.shares != null ? `${Number(tx.shares).toFixed(6)} shares` : '—'} @ {formatUSD(tx.executed_price)}
+                                                            {tx.shares != null ? `${Number(tx.shares).toFixed(6)} sh` : '—'} @ {formatUSD(tx.executed_price)}
                                                         </span>
-                                                        {(tx.commission || tx.vat || tx.fee || tx.sec_fee || tx.taf_fee) && (
-                                                            <span className="text-[10px] text-gray-400">
-                                                                Fees: {formatUSD(
-                                                                    (Number(tx.commission ?? 0)) +
-                                                                    (Number(tx.vat ?? 0)) +
-                                                                    (Number(tx.fee ?? 0)) +
-                                                                    (Number(tx.sec_fee ?? 0)) +
-                                                                    (Number(tx.taf_fee ?? 0))
-                                                                )}
-                                                            </span>
+                                                        {tx.stock_amount != null && (
+                                                            <span className="text-[10px] text-gray-400">Stock: {formatUSD(tx.stock_amount)}</span>
+                                                        )}
+                                                        {Number(tx.commission) > 0 && (
+                                                            <span className="text-[10px] text-gray-400">Commission: {formatUSD(tx.commission)}</span>
+                                                        )}
+                                                        {Number(tx.vat) > 0 && (
+                                                            <span className="text-[10px] text-gray-400">VAT: {formatUSD(tx.vat)}</span>
+                                                        )}
+                                                        {Number(tx.fee) > 0 && (
+                                                            <span className="text-[10px] text-gray-400">Fee: {formatUSD(tx.fee)}</span>
+                                                        )}
+                                                        {Number(tx.sec_fee) > 0 && (
+                                                            <span className="text-[10px] text-gray-400">SEC Fee: {formatUSD(tx.sec_fee)}</span>
+                                                        )}
+                                                        {Number(tx.taf_fee) > 0 && (
+                                                            <span className="text-[10px] text-gray-400">TAF Fee: {formatUSD(tx.taf_fee)}</span>
                                                         )}
                                                     </div>
                                                     <span className="font-bold text-gray-900">{formatUSD(tx.total_amount)}</span>
@@ -803,9 +996,13 @@ export default function DimeStock() {
                                     </div>
 
                                     {s.totalShares > 0 && (
-                                        <p className="text-[10px] text-gray-400 mt-2 pl-0.5">
-                                            Holding ≈ {s.totalShares.toFixed(6)} shares
-                                        </p>
+                                        <div className="bg-[#001f3f]/5 rounded-lg p-2 mt-2 flex justify-between items-center">
+                                            <div>
+                                                <p className="text-[10px] text-[#001f3f]/60 font-semibold mb-0.5">Stock in Portfolio</p>
+                                                <p className="text-sm font-bold text-[#001f3f]">{formatUSD(s.totalStockAmount)}</p>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400">{s.totalShares.toFixed(6)} sh</p>
+                                        </div>
                                     )}
                                     <p className="text-[10px] text-gray-300 mt-1 pl-0.5">
                                         Latest: {formatDate(s.latestDate)}
