@@ -1,0 +1,821 @@
+import { useEffect, useState, useMemo } from 'react';
+import { supabase } from '../supabaseClient';
+import type { DimeTransaction } from '../types';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Side = 'BUY' | 'SELL';
+
+interface FormState {
+    side: Side;
+    transaction_date: string;
+    symbol: string;
+    executed_price: string;
+    // BUY only
+    input_amount_usd: string;
+    // SELL only
+    input_shares: string;
+    commission: string;
+    vat: string;
+    fee: string;
+    sec_fee: string;
+    taf_fee: string;
+}
+
+interface SymbolSummary {
+    symbol: string;
+    totalBuyAmount: number;
+    totalSellAmount: number;
+    totalShares: number;
+    avgBuyPrice: number;
+    txCount: number;
+    latestDate: string; // ISO date of most recent transaction
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatUSD(value: number | null | undefined): string {
+    if (value == null) return '—';
+    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+function formatDate(dateString: string): string {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function todayISO(): string {
+    return new Date().toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+}
+
+// ─── JSON Templates ───────────────────────────────────────────────────────────
+
+const JSON_TEMPLATE_BUY = {
+    side: "BUY",
+    symbol: "AAPL",
+    transaction_date: "2026-02-20T10:30",
+    executed_price: "220.50",
+    input_amount_usd: "1000.00",
+    commission: "0.99",
+    vat: null,
+    fee: null,
+    sec_fee: null,
+    taf_fee: null
+};
+
+const JSON_TEMPLATE_SELL = {
+    side: "SELL",
+    symbol: "AAPL",
+    transaction_date: "2026-02-20T10:30",
+    executed_price: "220.50",
+    input_shares: "4.53515",
+    commission: "0.99",
+    vat: null,
+    fee: null,
+    sec_fee: null,
+    taf_fee: null
+};
+
+const INITIAL_FORM: FormState = {
+    side: 'BUY',
+    transaction_date: todayISO(),
+    symbol: '',
+    executed_price: '',
+    input_amount_usd: '',
+    input_shares: '',
+    commission: '',
+    vat: '',
+    fee: '',
+    sec_fee: '',
+    taf_fee: '',
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function DimeStock() {
+    const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState<FormState>(INITIAL_FORM);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    // JSON auto-fill
+    const [showJsonPanel, setShowJsonPanel] = useState(false);
+    const [jsonInput, setJsonInput] = useState('');
+    const [jsonError, setJsonError] = useState<string | null>(null);
+    const [jsonSuccess, setJsonSuccess] = useState(false);
+
+    const [activeTab, setActiveTab] = useState<'transactions' | 'summary'>('transactions');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+
+    // ── Fetch ──────────────────────────────────────────────────────────────────
+
+    const fetchTransactions = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('dime_transactions')
+                .select('*')
+                .order('transaction_date', { ascending: false });
+            if (error) throw error;
+            setTransactions((data as DimeTransaction[]) || []);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchTransactions(); }, []);
+
+    // ── Summary computation ────────────────────────────────────────────────────
+
+    const symbolSummaries: SymbolSummary[] = useMemo(() => {
+        const map: Record<string, SymbolSummary> = {};
+        transactions.forEach((tx) => {
+            const sym = tx.symbol || 'UNKNOWN';
+            if (!map[sym]) {
+                map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date };
+            }
+            map[sym].txCount++;
+            // Track the latest date
+            if (tx.transaction_date > map[sym].latestDate) {
+                map[sym].latestDate = tx.transaction_date;
+            }
+            if (tx.side === 'BUY') {
+                map[sym].totalBuyAmount += Number(tx.total_amount);
+                map[sym].totalShares += Number(tx.shares ?? 0);
+            } else {
+                map[sym].totalSellAmount += Number(tx.total_amount);
+                map[sym].totalShares -= Number(tx.shares ?? 0);
+            }
+        });
+        // Compute avg buy price
+        Object.values(map).forEach((s) => {
+            const buys = transactions.filter((t) => t.symbol === s.symbol && t.side === 'BUY');
+            if (buys.length > 0) {
+                s.avgBuyPrice = buys.reduce((acc, t) => acc + Number(t.executed_price), 0) / buys.length;
+            }
+        });
+        return Object.values(map).sort((a, b) => b.latestDate.localeCompare(a.latestDate));
+    }, [transactions]);
+
+    const overallBuy = useMemo(() => transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
+    const overallSell = useMemo(() => transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
+    const netPL = overallSell - overallBuy;
+
+    // ── Save transaction ───────────────────────────────────────────────────────
+
+    const handleSave = async () => {
+        setSaveError(null);
+        if (!form.symbol.trim() || !form.executed_price || !form.transaction_date) {
+            setSaveError('Symbol, date, and executed price are required.');
+            return;
+        }
+        if (form.side === 'BUY' && !form.input_amount_usd) {
+            setSaveError('Input Amount (USD) is required for BUY.');
+            return;
+        }
+        if (form.side === 'SELL' && !form.input_shares) {
+            setSaveError('Shares are required for SELL.');
+            return;
+        }
+
+        const execPrice = parseFloat(form.executed_price);
+        const commission = form.commission ? parseFloat(form.commission) : null;
+        const vat = form.vat ? parseFloat(form.vat) : null;
+        const fee = form.fee ? parseFloat(form.fee) : null;
+        const sec_fee = form.sec_fee ? parseFloat(form.sec_fee) : null;
+        const taf_fee = form.taf_fee ? parseFloat(form.taf_fee) : null;
+
+        let shares: number | null = null;
+        let total_amount: number;
+        let input_amount_usd: number | null = null;
+        let input_shares: number | null = null;
+
+        if (form.side === 'BUY') {
+            input_amount_usd = parseFloat(form.input_amount_usd);
+            shares = input_amount_usd / execPrice;
+            const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
+            total_amount = input_amount_usd + totalFees;
+        } else {
+            input_shares = parseFloat(form.input_shares);
+            shares = input_shares;
+            const stockAmount = input_shares * execPrice;
+            const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
+            total_amount = stockAmount - totalFees;
+        }
+
+        const payload = {
+            side: form.side,
+            transaction_date: new Date(form.transaction_date).toISOString(),
+            symbol: form.symbol.toUpperCase().trim(),
+            shares,
+            total_amount,
+            executed_price: execPrice,
+            commission,
+            vat,
+            fee,
+            sec_fee,
+            taf_fee,
+            input_amount_usd: form.side === 'BUY' ? input_amount_usd : null,
+            input_shares: form.side === 'SELL' ? input_shares : null,
+            stock_amount: shares ? shares * execPrice : null,
+            currency: 'USD',
+        };
+
+        try {
+            setSaving(true);
+            const { error } = await supabase.from('dime_transactions').insert([payload]);
+            if (error) throw error;
+            setShowForm(false);
+            setForm(INITIAL_FORM);
+            await fetchTransactions();
+        } catch (err: any) {
+            setSaveError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // ── Delete ─────────────────────────────────────────────────────────────────
+
+    const handleDelete = async (id: string) => {
+        try {
+            const { error } = await supabase.from('dime_transactions').delete().eq('id', id);
+            if (error) throw error;
+            setDeleteId(null);
+            await fetchTransactions();
+        } catch (err: any) {
+            alert('Delete failed: ' + err.message);
+        }
+    };
+
+    // ── JSON Auto-fill ─────────────────────────────────────────────────────────
+
+    const applyJson = () => {
+        setJsonError(null);
+        setJsonSuccess(false);
+        try {
+            const parsed = JSON.parse(jsonInput);
+            const newForm: FormState = { ...form };
+
+            if (parsed.side === 'BUY' || parsed.side === 'SELL') newForm.side = parsed.side;
+            if (parsed.symbol) newForm.symbol = String(parsed.symbol).toUpperCase().trim();
+            if (parsed.transaction_date) {
+                // Accept ISO string or YYYY-MM-DDTHH:mm format
+                const d = new Date(parsed.transaction_date);
+                if (!isNaN(d.getTime())) {
+                    newForm.transaction_date = d.toISOString().slice(0, 16);
+                }
+            }
+            if (parsed.executed_price != null) newForm.executed_price = String(parsed.executed_price);
+            if (parsed.input_amount_usd != null) newForm.input_amount_usd = String(parsed.input_amount_usd);
+            if (parsed.input_shares != null) newForm.input_shares = String(parsed.input_shares);
+            if (parsed.commission != null) newForm.commission = String(parsed.commission);
+            if (parsed.vat != null) newForm.vat = String(parsed.vat);
+            if (parsed.fee != null) newForm.fee = String(parsed.fee);
+            if (parsed.sec_fee != null) newForm.sec_fee = String(parsed.sec_fee);
+            if (parsed.taf_fee != null) newForm.taf_fee = String(parsed.taf_fee);
+
+            setForm(newForm);
+            setJsonSuccess(true);
+            setJsonInput('');
+            setTimeout(() => {
+                setShowJsonPanel(false);
+                setJsonSuccess(false);
+            }, 1200);
+        } catch {
+            setJsonError('Invalid JSON — please check the format and try again.');
+        }
+    };
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+
+    if (loading) return (
+        <div className="flex justify-center items-center min-h-[60vh] text-gray-400 text-sm gap-2">
+            <i className="pi pi-spin pi-spinner" />
+            Loading transactions...
+        </div>
+    );
+
+    if (error) return (
+        <div className="flex justify-center items-center min-h-[60vh] text-red-500 text-sm">{error}</div>
+    );
+
+    return (
+        <div className="flex flex-col gap-4 pb-28 pt-2 px-1">
+
+            {/* ── Header ─────────────────────────────────────────────────────── */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold text-[#001f3f]">Dime Stocks</h1>
+                    <span className="text-xs text-gray-400">{transactions.length} transactions</span>
+                </div>
+                <button
+                    onClick={() => { setShowForm(!showForm); setSaveError(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm
+            ${showForm ? 'bg-gray-100 text-gray-600' : 'bg-[#001f3f] text-white hover:bg-[#002f5f]'}`}
+                >
+                    <i className={`pi ${showForm ? 'pi-times' : 'pi-plus'} text-xs`} />
+                    {showForm ? 'Cancel' : 'Add Trade'}
+                </button>
+            </div>
+
+            {/* ── Overview Cards ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-2">
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                    <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider mb-0.5">Total Bought</p>
+                    <p className="text-sm font-bold text-blue-700">{formatUSD(overallBuy)}</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 border border-green-100">
+                    <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wider mb-0.5">Total Sold</p>
+                    <p className="text-sm font-bold text-green-700">{formatUSD(overallSell)}</p>
+                </div>
+                <div className={`rounded-xl p-3 border ${netPL >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${netPL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>Net P&amp;L</p>
+                    <p className={`text-sm font-bold ${netPL >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatUSD(netPL)}</p>
+                </div>
+            </div>
+
+            {/* ── Add Form ────────────────────────────────────────────────────── */}
+            {showForm && (
+                <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-4 flex flex-col gap-3 animate-in slide-in-from-top-2 duration-200">
+                    <h2 className="font-bold text-[#001f3f] text-base">New Transaction</h2>
+
+                    {/* Side Toggle */}
+                    <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                        {(['BUY', 'SELL'] as Side[]).map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => setForm({ ...form, side: s })}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all
+                  ${form.side === s
+                                        ? s === 'BUY' ? 'bg-blue-600 text-white shadow-sm' : 'bg-green-600 text-white shadow-sm'
+                                        : 'text-gray-500 hover:bg-gray-200'}`}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* ── JSON Auto-fill Panel ──────────────────────────────── */}
+                    <div className="border border-dashed border-amber-300 rounded-xl bg-amber-50/60 overflow-hidden">
+                        {/* Toggle header */}
+                        <button
+                            type="button"
+                            onClick={() => { setShowJsonPanel(!showJsonPanel); setJsonError(null); setJsonSuccess(false); }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-amber-700 hover:bg-amber-100/50 transition-colors"
+                        >
+                            <span className="flex items-center gap-1.5 text-xs font-semibold">
+                                <i className="pi pi-code text-[11px]" />
+                                Fill from JSON (AI OCR)
+                            </span>
+                            <i className={`pi ${showJsonPanel ? 'pi-chevron-up' : 'pi-chevron-down'} text-[10px] text-amber-500`} />
+                        </button>
+
+                        {showJsonPanel && (
+                            <div className="px-3 pb-3 flex flex-col gap-2">
+                                {/* Template */}
+                                <div className="relative">
+                                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Template ({form.side})</p>
+                                    <pre className="bg-white border border-amber-200 rounded-lg p-2 text-[10px] text-gray-600 leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
+                                        {JSON.stringify(
+                                            form.side === 'BUY' ? JSON_TEMPLATE_BUY : JSON_TEMPLATE_SELL,
+                                            null, 2
+                                        )}
+                                    </pre>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const tpl = form.side === 'BUY' ? JSON_TEMPLATE_BUY : JSON_TEMPLATE_SELL;
+                                            navigator.clipboard.writeText(JSON.stringify(tpl, null, 2));
+                                        }}
+                                        className="absolute top-5 right-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded-md font-medium transition-colors"
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
+
+                                {/* Paste area */}
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Paste OCR JSON here</label>
+                                    <textarea
+                                        value={jsonInput}
+                                        onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); setJsonSuccess(false); }}
+                                        placeholder={`{\n  "side": "${form.side}",\n  "symbol": "AAPL",\n  ...\n}`}
+                                        rows={5}
+                                        className="border border-amber-200 bg-white rounded-lg px-3 py-2 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
+                                    />
+                                </div>
+
+                                {jsonError && (
+                                    <p className="text-[11px] text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">{jsonError}</p>
+                                )}
+                                {jsonSuccess && (
+                                    <p className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                        <i className="pi pi-check-circle" /> Fields filled successfully!
+                                    </p>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={applyJson}
+                                    disabled={!jsonInput.trim()}
+                                    className="w-full py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <i className="pi pi-bolt mr-1.5" />
+                                    Apply JSON to Form
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Row: Symbol + Date */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Symbol *</label>
+                            <input
+                                type="text"
+                                value={form.symbol}
+                                onChange={(e) => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
+                                placeholder="AAPL"
+                                className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-[#001f3f] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20 uppercase"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Date *</label>
+                            <input
+                                type="datetime-local"
+                                value={form.transaction_date}
+                                onChange={(e) => setForm({ ...form, transaction_date: e.target.value })}
+                                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001f3f] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Executed Price */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Executed Price (USD) *</label>
+                        <input
+                            type="number"
+                            value={form.executed_price}
+                            onChange={(e) => setForm({ ...form, executed_price: e.target.value })}
+                            placeholder="0.00"
+                            step="0.0001"
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001f3f] focus:outline-none focus:ring-2 focus:ring-[#001f3f]/20"
+                        />
+                    </div>
+
+                    {/* BUY: input_amount_usd | SELL: input_shares */}
+                    {form.side === 'BUY' ? (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Input Amount USD *</label>
+                            <input
+                                type="number"
+                                value={form.input_amount_usd}
+                                onChange={(e) => setForm({ ...form, input_amount_usd: e.target.value })}
+                                placeholder="1000.00"
+                                step="0.000001"
+                                className="border border-blue-200 bg-blue-50/50 rounded-lg px-3 py-2 text-sm text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            />
+                            {form.input_amount_usd && form.executed_price && (
+                                <p className="text-[10px] text-blue-500 pl-1">
+                                    ≈ {(parseFloat(form.input_amount_usd) / parseFloat(form.executed_price)).toFixed(8)} shares
+                                </p>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-green-500 uppercase tracking-wider">Shares to Sell *</label>
+                            <input
+                                type="number"
+                                value={form.input_shares}
+                                onChange={(e) => setForm({ ...form, input_shares: e.target.value })}
+                                placeholder="0.00000000"
+                                step="0.00000001"
+                                className="border border-green-200 bg-green-50/50 rounded-lg px-3 py-2 text-sm text-green-900 focus:outline-none focus:ring-2 focus:ring-green-300"
+                            />
+                            {form.input_shares && form.executed_price && (
+                                <p className="text-[10px] text-green-600 pl-1">
+                                    ≈ {formatUSD(parseFloat(form.input_shares) * parseFloat(form.executed_price))} gross
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Fees */}
+                    <div>
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Fees (optional)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                { key: 'commission', label: 'Commission' },
+                                { key: 'vat', label: 'VAT' },
+                                { key: 'fee', label: 'Fee' },
+                                { key: 'sec_fee', label: 'SEC Fee' },
+                                { key: 'taf_fee', label: 'TAF Fee' },
+                            ].map(({ key, label }) => (
+                                <div key={key} className="flex flex-col gap-1">
+                                    <label className="text-[10px] text-gray-400 font-medium">{label}</label>
+                                    <input
+                                        type="number"
+                                        value={(form as any)[key]}
+                                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                                        placeholder="0.00"
+                                        step="0.000001"
+                                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {saveError && (
+                        <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{saveError}</p>
+                    )}
+
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm
+              ${form.side === 'BUY' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}
+              disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {saving ? <><i className="pi pi-spin pi-spinner mr-2" />Saving...</> : `Confirm ${form.side}`}
+                    </button>
+                </div>
+            )}
+
+            {/* ── Tab Switcher ────────────────────────────────────────────────── */}
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                {(['transactions', 'summary'] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all
+              ${activeTab === tab ? 'bg-white text-[#001f3f] shadow-sm' : 'text-gray-500'}`}
+                    >
+                        {tab === 'transactions' ? `Transactions (${transactions.length})` : `By Symbol (${symbolSummaries.length})`}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Transactions Tab ────────────────────────────────────────────── */}
+            {activeTab === 'transactions' && (
+                <div className="flex flex-col gap-2">
+                    {transactions.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                            <i className="pi pi-inbox text-3xl mb-2 opacity-40 block" />
+                            <p className="text-sm">No stock transactions yet</p>
+                            <p className="text-xs mt-1 opacity-60">Tap "Add Trade" to get started</p>
+                        </div>
+                    ) : (
+                        transactions.map((tx) => (
+                            <div
+                                key={tx.id}
+                                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative"
+                            >
+                                {/* Side accent bar */}
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : 'bg-green-500'}`} />
+
+                                <div className="pl-4 pr-3 pt-3 pb-3">
+                                    {/* Top row */}
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span className="text-base font-bold text-[#001f3f]">{tx.symbol || '—'}</span>
+                                            <span className="text-[10px] text-gray-400 ml-2">{formatDate(tx.transaction_date)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
+                        ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                                                {tx.side}
+                                            </span>
+                                            <button
+                                                onClick={() => setDeleteId(tx.id)}
+                                                className="text-gray-300 hover:text-red-400 transition-colors"
+                                            >
+                                                <i className="pi pi-trash text-xs" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Detail row */}
+                                    <div className="flex justify-between items-end text-sm">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-xs text-gray-500">
+                                                {tx.shares != null ? `${Number(tx.shares).toFixed(6)} shares` : '—'} @ {formatUSD(tx.executed_price)}
+                                            </span>
+                                            {(tx.commission || tx.vat || tx.fee || tx.sec_fee || tx.taf_fee) && (
+                                                <span className="text-[10px] text-gray-400">
+                                                    Fees: {formatUSD(
+                                                        (Number(tx.commission ?? 0)) +
+                                                        (Number(tx.vat ?? 0)) +
+                                                        (Number(tx.fee ?? 0)) +
+                                                        (Number(tx.sec_fee ?? 0)) +
+                                                        (Number(tx.taf_fee ?? 0))
+                                                    )}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="font-bold text-gray-900 text-base">{formatUSD(tx.total_amount)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Delete confirm */}
+                                {deleteId === tx.id && (
+                                    <div className="bg-red-50 border-t border-red-100 px-4 py-2.5 flex items-center justify-between">
+                                        <span className="text-xs text-red-600 font-medium">Delete this transaction?</span>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setDeleteId(null)} className="text-xs text-gray-500 px-2 py-1 hover:bg-gray-100 rounded">Cancel</button>
+                                            <button onClick={() => handleDelete(tx.id)} className="text-xs text-white bg-red-500 px-3 py-1 rounded-lg font-semibold">Confirm</button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* ── Summary Tab ─────────────────────────────────────────────────── */}
+            {activeTab === 'summary' && (
+                <div className="flex flex-col gap-2">
+                    {symbolSummaries.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                            <i className="pi pi-chart-bar text-3xl mb-2 opacity-40 block" />
+                            <p className="text-sm">No data to summarize</p>
+                        </div>
+                    ) : selectedSymbol ? (
+                        /* ── Symbol Detail View ───────────────────────────── */
+                        (() => {
+                            const s = symbolSummaries.find(x => x.symbol === selectedSymbol)!;
+                            const symTxs = transactions
+                                .filter(t => (t.symbol || 'UNKNOWN') === selectedSymbol)
+                                .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date));
+                            const realized = s.totalSellAmount - s.totalBuyAmount;
+                            return (
+                                <div className="flex flex-col gap-3">
+                                    {/* Back header */}
+                                    <button
+                                        onClick={() => setSelectedSymbol(null)}
+                                        className="flex items-center gap-2 text-[#001f3f] text-sm font-semibold hover:opacity-70 transition-opacity self-start"
+                                    >
+                                        <i className="pi pi-arrow-left text-xs" />
+                                        All Symbols
+                                    </button>
+
+                                    {/* Symbol header card */}
+                                    <div className="bg-[#001f3f] rounded-2xl p-4 text-white">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h2 className="text-2xl font-bold">{selectedSymbol}</h2>
+                                                <p className="text-xs text-blue-200 mt-0.5">{s.txCount} trade{s.txCount !== 1 ? 's' : ''}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-blue-300 uppercase tracking-wider">Net P&L</p>
+                                                <p className={`text-lg font-bold ${realized >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                    {realized >= 0 ? '+' : ''}{formatUSD(realized)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                            <div className="bg-white/10 rounded-xl p-2">
+                                                <p className="text-blue-300 font-semibold mb-0.5">Bought</p>
+                                                <p className="font-bold">{formatUSD(s.totalBuyAmount)}</p>
+                                            </div>
+                                            <div className="bg-white/10 rounded-xl p-2">
+                                                <p className="text-blue-300 font-semibold mb-0.5">Sold</p>
+                                                <p className="font-bold">{formatUSD(s.totalSellAmount)}</p>
+                                            </div>
+                                            <div className="bg-white/10 rounded-xl p-2">
+                                                <p className="text-blue-300 font-semibold mb-0.5">Avg Buy</p>
+                                                <p className="font-bold">{formatUSD(s.avgBuyPrice)}</p>
+                                            </div>
+                                        </div>
+                                        {s.totalShares > 0 && (
+                                            <p className="text-[10px] text-blue-300 mt-2">
+                                                Holding ≈ {s.totalShares.toFixed(6)} shares
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Transaction list for symbol */}
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Transactions</p>
+                                    {symTxs.map((tx) => (
+                                        <div
+                                            key={tx.id}
+                                            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative"
+                                        >
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                                            <div className="pl-4 pr-3 pt-3 pb-3">
+                                                <div className="flex justify-between items-start mb-1.5">
+                                                    <div>
+                                                        <span className="text-xs font-semibold text-gray-500">{formatDate(tx.transaction_date)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
+                                                            ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                                                            {tx.side}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => setDeleteId(tx.id)}
+                                                            className="text-gray-300 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <i className="pi pi-trash text-xs" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between items-end">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-xs text-gray-500">
+                                                            {tx.shares != null ? `${Number(tx.shares).toFixed(6)} shares` : '—'} @ {formatUSD(tx.executed_price)}
+                                                        </span>
+                                                        {(tx.commission || tx.vat || tx.fee || tx.sec_fee || tx.taf_fee) && (
+                                                            <span className="text-[10px] text-gray-400">
+                                                                Fees: {formatUSD(
+                                                                    (Number(tx.commission ?? 0)) +
+                                                                    (Number(tx.vat ?? 0)) +
+                                                                    (Number(tx.fee ?? 0)) +
+                                                                    (Number(tx.sec_fee ?? 0)) +
+                                                                    (Number(tx.taf_fee ?? 0))
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="font-bold text-gray-900">{formatUSD(tx.total_amount)}</span>
+                                                </div>
+                                            </div>
+                                            {deleteId === tx.id && (
+                                                <div className="bg-red-50 border-t border-red-100 px-4 py-2.5 flex items-center justify-between">
+                                                    <span className="text-xs text-red-600 font-medium">Delete this transaction?</span>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => setDeleteId(null)} className="text-xs text-gray-500 px-2 py-1 hover:bg-gray-100 rounded">Cancel</button>
+                                                        <button onClick={() => handleDelete(tx.id)} className="text-xs text-white bg-red-500 px-3 py-1 rounded-lg font-semibold">Confirm</button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()
+                    ) : (
+                        /* ── Symbol List ──────────────────────────────────── */
+                        symbolSummaries.map((s) => {
+                            const realized = s.totalSellAmount - s.totalBuyAmount;
+                            return (
+                                <button
+                                    key={s.symbol}
+                                    onClick={() => setSelectedSymbol(s.symbol)}
+                                    className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-left w-full hover:shadow-md hover:border-gray-200 transition-all active:scale-[0.99]"
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <span className="text-base font-bold text-[#001f3f]">{s.symbol}</span>
+                                            <span className="text-[10px] text-gray-400 ml-2">{s.txCount} trade{s.txCount !== 1 ? 's' : ''}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-sm font-bold ${realized >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                {realized >= 0 ? '+' : ''}{formatUSD(realized)}
+                                            </span>
+                                            <i className="pi pi-chevron-right text-[10px] text-gray-300" />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                        <div className="bg-blue-50 rounded-lg p-2">
+                                            <p className="text-blue-400 font-semibold mb-0.5">Bought</p>
+                                            <p className="text-blue-800 font-bold">{formatUSD(s.totalBuyAmount)}</p>
+                                        </div>
+                                        <div className="bg-green-50 rounded-lg p-2">
+                                            <p className="text-green-400 font-semibold mb-0.5">Sold</p>
+                                            <p className="text-green-800 font-bold">{formatUSD(s.totalSellAmount)}</p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-lg p-2">
+                                            <p className="text-gray-400 font-semibold mb-0.5">Avg Price</p>
+                                            <p className="text-gray-800 font-bold">{formatUSD(s.avgBuyPrice)}</p>
+                                        </div>
+                                    </div>
+
+                                    {s.totalShares > 0 && (
+                                        <p className="text-[10px] text-gray-400 mt-2 pl-0.5">
+                                            Holding ≈ {s.totalShares.toFixed(6)} shares
+                                        </p>
+                                    )}
+                                    <p className="text-[10px] text-gray-300 mt-1 pl-0.5">
+                                        Latest: {formatDate(s.latestDate)}
+                                    </p>
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

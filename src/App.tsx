@@ -5,6 +5,7 @@ import AccountDetails from './pages/AccountDetails';
 import Transactions from './pages/Transactions';
 import FXPage from './pages/FXPage';
 import FXAnalytics from './pages/FXAnalytics';
+import DimeStock from './pages/DimeStock';
 import './App.css';
 
 function NavItem({ to, label, icon }: { to: string, label: string, icon: string }) {
@@ -30,7 +31,7 @@ function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
             <div className="mx-auto max-w-lg bg-white shadow-[0_-4px_6px_rgba(0,0,0,0.05)]">
-                <div className="grid grid-cols-4 h-[64px] items-center">
+                <div className="grid grid-cols-4 h-[84px] items-center">
                     <NavItem
                         to="/"
                         label="Dashboard"
@@ -50,9 +51,9 @@ function BottomNav() {
                     />
 
                     <NavItem
-                        to="/settings"
-                        label="Settings"
-                        icon="pi pi-cog"
+                        to="/dime-stock"
+                        label="Dime Stock"
+                        icon="pi pi-chart-line"
                     />
                 </div>
             </div>
@@ -84,6 +85,7 @@ function App() {
                         <Route path="/transactions" element={<Transactions />} />
                         <Route path="/fx" element={<FXPage />} />
                         <Route path="/fx/analytics" element={<FXAnalytics />} />
+                        <Route path="/dime-stock" element={<DimeStock />} />
                         <Route path="/account/:accountName" element={<AccountDetails />} />
                     </Routes>
                 </div>
