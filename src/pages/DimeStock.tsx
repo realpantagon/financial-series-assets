@@ -167,40 +167,69 @@ export default function DimeStock() {
 
     const symbolSummaries: SymbolSummary[] = useMemo(() => {
         const map: Record<string, SymbolSummary> = {};
-        transactions.forEach((tx) => {
-            const sym = tx.symbol || 'UNKNOWN';
-            if (!map[sym]) {
-                map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0 };
-            }
-            map[sym].txCount++;
-            if (tx.transaction_date > map[sym].latestDate) {
-                map[sym].latestDate = tx.transaction_date;
-            }
 
-            if (tx.side === 'BUY') {
-                map[sym].totalBuyAmount += Number(tx.total_amount);
-                map[sym].totalShares += Number(tx.shares ?? 0);
-                map[sym].totalStockAmount += Number(tx.stock_amount ?? 0);
-            } else if (tx.side === 'INIT') {
-                // INIT = initial portfolio position: use stock_amount as invested value
-                const stockAmt = Number(tx.stock_amount ?? 0);
+        // 1. Process all BUYS and INITS first
+        transactions
+            .filter(t => t.side === 'BUY' || t.side === 'INIT')
+            .forEach((tx) => {
+                const sym = tx.symbol || 'UNKNOWN';
+                if (!map[sym]) {
+                    map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0 };
+                }
+                map[sym].txCount++;
+                if (tx.transaction_date > map[sym].latestDate) {
+                    map[sym].latestDate = tx.transaction_date;
+                }
+
+                const stockAmt = tx.side === 'INIT' ? Number(tx.stock_amount ?? 0) : Number(tx.total_amount);
                 map[sym].totalBuyAmount += stockAmt;
                 map[sym].totalShares += Number(tx.shares ?? 0);
-                map[sym].totalStockAmount += stockAmt;
-            } else {
-                // SELL
-                map[sym].totalSellAmount += Number(tx.total_amount);
-                map[sym].totalShares -= Number(tx.shares ?? 0);
-                map[sym].totalStockAmount -= Number(tx.stock_amount ?? 0);
-            }
-        });
-        // Compute avg buy price from BUY + INIT
+                map[sym].totalStockAmount += Number(tx.stock_amount ?? 0);
+            });
+
+        // 2. Calculate the true average buy price based on the total accumulated cost and shares
         Object.values(map).forEach((s) => {
-            const buys = transactions.filter((t) => t.symbol === s.symbol && (t.side === 'BUY' || t.side === 'INIT'));
-            if (buys.length > 0) {
-                s.avgBuyPrice = buys.reduce((acc, t) => acc + Number(t.executed_price), 0) / buys.length;
+            if (s.totalShares > 0) {
+                s.avgBuyPrice = s.totalStockAmount / s.totalShares;
+            } else {
+                s.avgBuyPrice = 0;
             }
         });
+
+        // 3. Process SELLS and reduce totalStockAmount by the pro-rated average cost
+        transactions
+            .filter(t => t.side === 'SELL')
+            .forEach((tx) => {
+                const sym = tx.symbol || 'UNKNOWN';
+                if (!map[sym]) {
+                    map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0 };
+                }
+                map[sym].txCount++;
+                if (tx.transaction_date > map[sym].latestDate) {
+                    map[sym].latestDate = tx.transaction_date;
+                }
+
+                const sharesSold = Number(tx.shares ?? 0);
+                map[sym].totalSellAmount += Number(tx.total_amount);
+
+                // Track remaining shares
+                map[sym].totalShares -= sharesSold;
+
+                // Reduce the initial stock amount by (shares sold * avg cost)
+                const costOfSharesSold = sharesSold * map[sym].avgBuyPrice;
+                map[sym].totalStockAmount -= costOfSharesSold;
+            });
+
+        // 4. Clean up any weird float precision issues
+        Object.values(map).forEach((s) => {
+            if (s.totalShares <= 0.000001) {
+                s.totalShares = 0;
+                s.totalStockAmount = 0;
+            } else {
+                s.totalStockAmount = Math.max(0, s.totalStockAmount); // prevent slight negatives
+            }
+        });
+
         // Sort by total stock amount (largest position first)
         return Object.values(map).sort((a, b) => b.totalStockAmount - a.totalStockAmount);
     }, [transactions]);
@@ -934,7 +963,7 @@ export default function DimeStock() {
                                         {/* Hero: stock value */}
                                         <div className="mt-3 mb-3">
                                             <p className="text-[10px] text-blue-400 uppercase tracking-wider mb-0.5">Stock Amount</p>
-                                            <p className="text-3xl font-bold">{formatUSD(s.totalBuyAmount)}</p>
+                                            <p className="text-3xl font-bold">{formatUSD(s.totalStockAmount)}</p>
                                         </div>
 
                                         {/* Key metrics row */}
@@ -1059,7 +1088,7 @@ export default function DimeStock() {
                                     {/* Main stock amount */}
                                     <div className="bg-blue-50 rounded-xl p-3 mb-2">
                                         <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider mb-0.5">Stock Amount</p>
-                                        <p className="text-lg font-bold text-blue-700">{formatUSD(s.totalBuyAmount)}</p>
+                                        <p className="text-lg font-bold text-blue-700">{formatUSD(s.totalStockAmount)}</p>
                                         {s.totalShares > 0 && (
                                             <p className="text-[10px] text-blue-400 mt-0.5">{s.totalShares.toFixed(7)} shares held</p>
                                         )}
