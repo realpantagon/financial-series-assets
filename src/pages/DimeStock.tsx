@@ -435,8 +435,7 @@ export default function DimeStock() {
             // Strip markdown fences
             raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
             // Normalize all smart/fancy quotes to standard quotes before JSON decode
-            raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
-            raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
+            raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
 
             // Try array first
             const arrMatch = raw.match(/\[[\s\S]*\]/);
