@@ -23,7 +23,7 @@ export interface PantagonUSD {
 
 export interface DimeTransaction {
   id: string; // uuid
-  side: 'BUY' | 'SELL';
+  side: 'BUY' | 'SELL' | 'INIT';
   transaction_date: string; // ISO timestamp
   symbol: string | null;
   shares: number | null;

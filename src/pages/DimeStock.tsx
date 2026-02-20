@@ -113,7 +113,7 @@ export default function DimeStock() {
     const [batchSaving, setBatchSaving] = useState(false);
     const [batchError, setBatchError] = useState<string | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'transactions' | 'summary'>('transactions');
+    const [activeTab, setActiveTab] = useState<'transactions' | 'summary'>('summary');
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
@@ -147,38 +147,54 @@ export default function DimeStock() {
                 map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0 };
             }
             map[sym].txCount++;
-            // Track the latest date
             if (tx.transaction_date > map[sym].latestDate) {
                 map[sym].latestDate = tx.transaction_date;
             }
+
             if (tx.side === 'BUY') {
                 map[sym].totalBuyAmount += Number(tx.total_amount);
                 map[sym].totalShares += Number(tx.shares ?? 0);
                 map[sym].totalStockAmount += Number(tx.stock_amount ?? 0);
+            } else if (tx.side === 'INIT') {
+                // INIT = initial portfolio position: use stock_amount as invested value
+                const stockAmt = Number(tx.stock_amount ?? 0);
+                map[sym].totalBuyAmount += stockAmt;
+                map[sym].totalShares += Number(tx.shares ?? 0);
+                map[sym].totalStockAmount += stockAmt;
             } else {
+                // SELL
                 map[sym].totalSellAmount += Number(tx.total_amount);
                 map[sym].totalShares -= Number(tx.shares ?? 0);
                 map[sym].totalStockAmount -= Number(tx.stock_amount ?? 0);
             }
         });
-        // Compute avg buy price
+        // Compute avg buy price from BUY + INIT
         Object.values(map).forEach((s) => {
-            const buys = transactions.filter((t) => t.symbol === s.symbol && t.side === 'BUY');
+            const buys = transactions.filter((t) => t.symbol === s.symbol && (t.side === 'BUY' || t.side === 'INIT'));
             if (buys.length > 0) {
                 s.avgBuyPrice = buys.reduce((acc, t) => acc + Number(t.executed_price), 0) / buys.length;
             }
         });
-        return Object.values(map).sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
+        // Sort by total stock amount (largest position first)
+        return Object.values(map).sort((a, b) => b.totalStockAmount - a.totalStockAmount);
     }, [transactions]);
 
-    const overallBuy = useMemo(() => transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
-    const overallSell = useMemo(() => transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
-    const netPL = overallSell - overallBuy;
-    // Total net stock value = sum of stock_amount (BUY) - sum of stock_amount (SELL)
-    const currentStockValue = useMemo(() =>
-        transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0) -
-        transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0)
+    // INIT: stock_amount = value; BUY: total_amount = cash spent
+    const overallBuy = useMemo(() =>
+        transactions.filter(t => t.side === 'INIT').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0) +
+        transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.total_amount), 0)
         , [transactions]);
+    const overallSell = useMemo(() => transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
+    const netPL = useMemo(() => {
+        // P&L = only realized gain/loss from actual SELL transactions
+        // SELL proceeds minus cost of those sold shares (avg buy price × shares sold)
+        return symbolSummaries.reduce((total, s) => {
+            if (s.totalSellAmount === 0) return total;
+            // Approximate: SELL total - proportional buy cost
+            const sellRatio = s.totalShares < 0 ? 1 : (Math.abs(s.totalSellAmount) / (s.totalBuyAmount || 1));
+            return total + s.totalSellAmount - (s.totalBuyAmount * Math.min(sellRatio, 1));
+        }, 0);
+    }, [symbolSummaries]);
 
     // ── Save transaction ───────────────────────────────────────────────────────
 
@@ -442,9 +458,9 @@ export default function DimeStock() {
             {/* Portfolio Value — full-width hero card */}
             <div className="bg-[#001f3f] rounded-2xl p-4 text-white flex justify-between items-center">
                 <div>
-                    <p className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider mb-0.5">Stock in Portfolio</p>
-                    <p className="text-2xl font-bold">{formatUSD(currentStockValue)}</p>
-                    <p className="text-[10px] text-blue-400 mt-0.5">{symbolSummaries.filter(s => s.totalShares > 0).length} symbols held</p>
+                    <p className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider mb-0.5">Total Invested in Stocks</p>
+                    <p className="text-2xl font-bold">{formatUSD(overallBuy)}</p>
+                    <p className="text-[10px] text-blue-400 mt-0.5">{symbolSummaries.length} symbol{symbolSummaries.length !== 1 ? 's' : ''} • {transactions.filter(t => t.side === 'INIT').length} init + {transactions.filter(t => t.side === 'BUY').length} buys</p>
                 </div>
                 <i className="pi pi-chart-line text-3xl text-blue-400 opacity-60" />
             </div>
@@ -765,7 +781,7 @@ export default function DimeStock() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
-                        ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                        ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : tx.side === 'INIT' ? 'bg-purple-50 text-purple-600' : 'bg-green-50 text-green-600'}`}>
                                                 {tx.side}
                                             </span>
                                             <button
@@ -777,32 +793,37 @@ export default function DimeStock() {
                                         </div>
                                     </div>
 
-                                    {/* Detail row */}
-                                    <div className="flex justify-between items-start text-sm mt-1">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-xs text-gray-500">
-                                                {tx.shares != null ? `${Number(tx.shares).toFixed(6)} sh` : '—'} @ {formatUSD(tx.executed_price)}
+                                    {/* Badge detail row */}
+                                    <div className="flex justify-between items-end mt-2">
+                                        <div className="flex flex-wrap gap-1">
+                                            {tx.shares != null && (
+                                                <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                    <i className="pi pi-chart-bar text-[8px]" />
+                                                    {Number(tx.shares).toFixed(7)} sh
+                                                </span>
+                                            )}
+                                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                @ {formatUSD(tx.executed_price)}
                                             </span>
-                                            {tx.stock_amount != null && (
-                                                <span className="text-[10px] text-gray-400">Stock: {formatUSD(tx.stock_amount)}</span>
+                                            {tx.stock_amount != null && Number(tx.stock_amount) > 0 && (
+                                                <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                    Stock {formatUSD(tx.stock_amount)}
+                                                </span>
                                             )}
                                             {Number(tx.commission) > 0 && (
-                                                <span className="text-[10px] text-gray-400">Commission: {formatUSD(tx.commission)}</span>
+                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">Fee {formatUSD(tx.commission)}</span>
                                             )}
                                             {Number(tx.vat) > 0 && (
-                                                <span className="text-[10px] text-gray-400">VAT: {formatUSD(tx.vat)}</span>
-                                            )}
-                                            {Number(tx.fee) > 0 && (
-                                                <span className="text-[10px] text-gray-400">Fee: {formatUSD(tx.fee)}</span>
+                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">VAT {formatUSD(tx.vat)}</span>
                                             )}
                                             {Number(tx.sec_fee) > 0 && (
-                                                <span className="text-[10px] text-gray-400">SEC Fee: {formatUSD(tx.sec_fee)}</span>
+                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">SEC {formatUSD(tx.sec_fee)}</span>
                                             )}
                                             {Number(tx.taf_fee) > 0 && (
-                                                <span className="text-[10px] text-gray-400">TAF Fee: {formatUSD(tx.taf_fee)}</span>
+                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">TAF {formatUSD(tx.taf_fee)}</span>
                                             )}
                                         </div>
-                                        <span className="font-bold text-gray-900 text-base">{formatUSD(tx.total_amount)}</span>
+                                        <span className="font-bold text-gray-900 text-base shrink-0 ml-2">{formatUSD(tx.total_amount)}</span>
                                     </div>
                                 </div>
 
@@ -837,7 +858,7 @@ export default function DimeStock() {
                             const symTxs = transactions
                                 .filter(t => (t.symbol || 'UNKNOWN') === selectedSymbol)
                                 .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date));
-                            const realized = s.totalSellAmount - s.totalBuyAmount;
+                            const realized = s.totalSellAmount > 0 ? s.totalSellAmount - s.totalBuyAmount : 0;
                             return (
                                 <div className="flex flex-col gap-3">
                                     {/* Back header */}
@@ -849,45 +870,47 @@ export default function DimeStock() {
                                         All Symbols
                                     </button>
 
-                                    {/* Symbol header card */}
+                                    {/* Symbol header card — clean redesign */}
                                     <div className="bg-[#001f3f] rounded-2xl p-4 text-white">
-                                        <div className="flex justify-between items-start mb-3">
+                                        {/* Top row: symbol + P&L */}
+                                        <div className="flex justify-between items-start">
                                             <div>
-                                                <h2 className="text-2xl font-bold">{selectedSymbol}</h2>
-                                                <p className="text-xs text-blue-200 mt-0.5">{s.txCount} trade{s.txCount !== 1 ? 's' : ''}</p>
+                                                <h2 className="text-2xl font-bold tracking-tight">{selectedSymbol}</h2>
+                                                <p className="text-xs text-blue-300 mt-0.5">{s.txCount} trade{s.txCount !== 1 ? 's' : ''}</p>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-blue-300 uppercase tracking-wider">Net P&L</p>
-                                                <p className={`text-lg font-bold ${realized >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                                                    {realized >= 0 ? '+' : ''}{formatUSD(realized)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-[11px]">
-                                            <div className="bg-white/10 rounded-xl p-2">
-                                                <p className="text-blue-300 font-semibold mb-0.5">Bought</p>
-                                                <p className="font-bold">{formatUSD(s.totalBuyAmount)}</p>
-                                            </div>
-                                            <div className="bg-white/10 rounded-xl p-2">
-                                                <p className="text-blue-300 font-semibold mb-0.5">Sold</p>
-                                                <p className="font-bold">{formatUSD(s.totalSellAmount)}</p>
-                                            </div>
-                                            <div className="bg-white/10 rounded-xl p-2">
-                                                <p className="text-blue-300 font-semibold mb-0.5">Avg Buy</p>
-                                                <p className="font-bold">{formatUSD(s.avgBuyPrice)}</p>
-                                            </div>
-                                        </div>
-                                        {s.totalShares > 0 && (
-                                            <div className="mt-2 bg-white/10 rounded-xl p-2.5 flex justify-between items-center">
-                                                <div>
-                                                    <p className="text-[10px] text-blue-300 font-semibold mb-0.5">Stock in Portfolio</p>
-                                                    <p className="font-bold text-sm">{formatUSD(s.totalStockAmount)}</p>
+                                            {realized !== 0 && (
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-blue-400 uppercase tracking-wider">Net P&L</p>
+                                                    <p className={`text-lg font-bold ${realized >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                        {realized >= 0 ? '+' : ''}{formatUSD(realized)}
+                                                    </p>
                                                 </div>
-                                                <p className="text-[10px] text-blue-300">
-                                                    {s.totalShares.toFixed(6)} shares
-                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Hero: stock value */}
+                                        <div className="mt-3 mb-3">
+                                            <p className="text-[10px] text-blue-400 uppercase tracking-wider mb-0.5">Stock Amount</p>
+                                            <p className="text-3xl font-bold">{formatUSD(s.totalBuyAmount)}</p>
+                                        </div>
+
+                                        {/* Key metrics row */}
+                                        <div className="flex gap-4 text-[11px] border-t border-white/10 pt-3">
+                                            <div>
+                                                <p className="text-blue-400 mb-0.5">Shares</p>
+                                                <p className="font-semibold">{s.totalShares.toFixed(7)}</p>
                                             </div>
-                                        )}
+                                            <div>
+                                                <p className="text-blue-400 mb-0.5">Avg Buy</p>
+                                                <p className="font-semibold">{formatUSD(s.avgBuyPrice)}</p>
+                                            </div>
+                                            {s.totalSellAmount > 0 && (
+                                                <div>
+                                                    <p className="text-blue-400 mb-0.5">Sold</p>
+                                                    <p className="font-semibold text-emerald-300">{formatUSD(s.totalSellAmount)}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Transaction list for symbol */}
@@ -897,17 +920,16 @@ export default function DimeStock() {
                                             key={tx.id}
                                             className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative"
                                         >
-                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : tx.side === 'INIT' ? 'bg-purple-400' : 'bg-emerald-500'
+                                                }`} />
                                             <div className="pl-4 pr-3 pt-3 pb-3">
                                                 <div className="flex justify-between items-start mb-1.5">
                                                     <div>
                                                         <span className="text-xs font-semibold text-gray-500">{formatDate(tx.transaction_date)}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
-                                                            ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
-                                                            {tx.side}
-                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : tx.side === 'INIT' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'
+                                                            }`}>{tx.side}</span>
                                                         <button
                                                             onClick={() => setDeleteId(tx.id)}
                                                             className="text-gray-300 hover:text-red-400 transition-colors"
@@ -916,31 +938,42 @@ export default function DimeStock() {
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="text-xs text-gray-500">
-                                                            {tx.shares != null ? `${Number(tx.shares).toFixed(6)} sh` : '—'} @ {formatUSD(tx.executed_price)}
+                                                {/* Badge detail row */}
+                                                <div className="flex justify-between items-end mt-2">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {tx.shares != null && (
+                                                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                                <i className="pi pi-chart-bar text-[8px]" />
+                                                                {Number(tx.shares).toFixed(7)} sh
+                                                            </span>
+                                                        )}
+                                                        <span className="inline-flex items-center bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                            @ {formatUSD(tx.executed_price)}
                                                         </span>
-                                                        {tx.stock_amount != null && (
-                                                            <span className="text-[10px] text-gray-400">Stock: {formatUSD(tx.stock_amount)}</span>
+                                                        {tx.stock_amount != null && Number(tx.stock_amount) > 0 && (
+                                                            <span className="inline-flex items-center bg-blue-50 text-blue-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                                Stock {formatUSD(tx.stock_amount)}
+                                                            </span>
                                                         )}
                                                         {Number(tx.commission) > 0 && (
-                                                            <span className="text-[10px] text-gray-400">Commission: {formatUSD(tx.commission)}</span>
+                                                            <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">Fee {formatUSD(tx.commission)}</span>
                                                         )}
                                                         {Number(tx.vat) > 0 && (
-                                                            <span className="text-[10px] text-gray-400">VAT: {formatUSD(tx.vat)}</span>
-                                                        )}
-                                                        {Number(tx.fee) > 0 && (
-                                                            <span className="text-[10px] text-gray-400">Fee: {formatUSD(tx.fee)}</span>
+                                                            <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">VAT {formatUSD(tx.vat)}</span>
                                                         )}
                                                         {Number(tx.sec_fee) > 0 && (
-                                                            <span className="text-[10px] text-gray-400">SEC Fee: {formatUSD(tx.sec_fee)}</span>
+                                                            <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">SEC {formatUSD(tx.sec_fee)}</span>
                                                         )}
                                                         {Number(tx.taf_fee) > 0 && (
-                                                            <span className="text-[10px] text-gray-400">TAF Fee: {formatUSD(tx.taf_fee)}</span>
+                                                            <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">TAF {formatUSD(tx.taf_fee)}</span>
                                                         )}
                                                     </div>
-                                                    <span className="font-bold text-gray-900">{formatUSD(tx.total_amount)}</span>
+                                                    {/* Amount: INIT shows stock_amount, others show total_amount */}
+                                                    <span className="font-bold text-gray-900 shrink-0 ml-2">
+                                                        {tx.side === 'INIT'
+                                                            ? formatUSD(tx.stock_amount)
+                                                            : formatUSD(tx.total_amount)}
+                                                    </span>
                                                 </div>
                                             </div>
                                             {deleteId === tx.id && (
@@ -960,7 +993,7 @@ export default function DimeStock() {
                     ) : (
                         /* ── Symbol List ──────────────────────────────────── */
                         symbolSummaries.map((s) => {
-                            const realized = s.totalSellAmount - s.totalBuyAmount;
+                            const realized = s.totalSellAmount > 0 ? s.totalSellAmount - s.totalBuyAmount : 0;
                             return (
                                 <button
                                     key={s.symbol}
@@ -980,11 +1013,16 @@ export default function DimeStock() {
                                         </div>
                                     </div>
 
+                                    {/* Main stock amount */}
+                                    <div className="bg-blue-50 rounded-xl p-3 mb-2">
+                                        <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider mb-0.5">Stock Amount</p>
+                                        <p className="text-lg font-bold text-blue-700">{formatUSD(s.totalBuyAmount)}</p>
+                                        {s.totalShares > 0 && (
+                                            <p className="text-[10px] text-blue-400 mt-0.5">{s.totalShares.toFixed(7)} shares held</p>
+                                        )}
+                                    </div>
+
                                     <div className="grid grid-cols-3 gap-2 text-[11px]">
-                                        <div className="bg-blue-50 rounded-lg p-2">
-                                            <p className="text-blue-400 font-semibold mb-0.5">Bought</p>
-                                            <p className="text-blue-800 font-bold">{formatUSD(s.totalBuyAmount)}</p>
-                                        </div>
                                         <div className="bg-green-50 rounded-lg p-2">
                                             <p className="text-green-400 font-semibold mb-0.5">Sold</p>
                                             <p className="text-green-800 font-bold">{formatUSD(s.totalSellAmount)}</p>
@@ -993,20 +1031,15 @@ export default function DimeStock() {
                                             <p className="text-gray-400 font-semibold mb-0.5">Avg Price</p>
                                             <p className="text-gray-800 font-bold">{formatUSD(s.avgBuyPrice)}</p>
                                         </div>
-                                    </div>
-
-                                    {s.totalShares > 0 && (
-                                        <div className="bg-[#001f3f]/5 rounded-lg p-2 mt-2 flex justify-between items-center">
-                                            <div>
-                                                <p className="text-[10px] text-[#001f3f]/60 font-semibold mb-0.5">Stock in Portfolio</p>
-                                                <p className="text-sm font-bold text-[#001f3f]">{formatUSD(s.totalStockAmount)}</p>
-                                            </div>
-                                            <p className="text-[10px] text-gray-400">{s.totalShares.toFixed(6)} sh</p>
+                                        <div className={`rounded-lg p-2 ${realized >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                                            <p className={`font-semibold mb-0.5 ${realized >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>P&amp;L</p>
+                                            <p className={`font-bold ${realized >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{realized >= 0 ? '+' : ''}{formatUSD(realized)}</p>
                                         </div>
-                                    )}
-                                    <p className="text-[10px] text-gray-300 mt-1 pl-0.5">
+                                    </div>
+                                    <p className="text-[10px] text-gray-300 mt-1.5 pl-0.5">
                                         Latest: {formatDate(s.latestDate)}
                                     </p>
+
                                 </button>
                             );
                         })
