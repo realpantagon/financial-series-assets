@@ -52,31 +52,55 @@ function todayISO(): string {
 
 // ─── JSON Templates ───────────────────────────────────────────────────────────
 
-const JSON_TEMPLATE_BUY = {
-    side: "BUY",
-    symbol: "AAPL",
-    transaction_date: "2026-02-20T10:30:00Z",
-    executed_price: 220.50,
-    input_amount_usd: 1000.00,
-    commission: 0.99,
-    vat: 0.0065,
-    fee: null,
-    sec_fee: null,
-    taf_fee: null
-};
 
-const JSON_TEMPLATE_SELL = {
-    side: "SELL",
-    symbol: "AAPL",
-    transaction_date: "2026-02-20T10:30:00Z",
-    executed_price: 220.50,
-    input_shares: 4.53515,
-    commission: 0.99,
-    vat: 0.0065,
-    fee: null,
-    sec_fee: null,
-    taf_fee: null
-};
+
+
+const AI_OCR_PROMPT = `You are a stock transaction data extraction assistant.
+
+Look at the attached stock transaction image/slip and extract the data into JSON format exactly as shown below.
+
+Rules:
+- side: "BUY" if buying shares, "SELL" if selling shares
+- symbol: stock ticker (e.g. "AAPL", "NVDA")
+- transaction_date: ISO 8601 format "YYYY-MM-DDTHH:mmZ" (use UTC)
+- executed_price: price per share (number)
+- For BUY: use "input_amount_usd" = total USD amount invested (number)
+- For SELL: use "input_shares" = number of shares sold (number)
+- commission, vat, fee, sec_fee, taf_fee: fee amounts as numbers (use null if not present)
+- All fees should be positive numbers
+
+BUY format:
+{
+  "side": "BUY",
+  "symbol": "AAPL",
+  "transaction_date": "2026-02-20T10:30:00Z",
+  "executed_price": 220.50,
+  "input_amount_usd": 1000.00,
+  "commission": 0.99,
+  "vat": 0.0065,
+  "fee": null,
+  "sec_fee": null,
+  "taf_fee": null
+}
+
+SELL format:
+{
+  "side": "SELL",
+  "symbol": "AAPL",
+  "transaction_date": "2026-02-20T10:30:00Z",
+  "executed_price": 220.50,
+  "input_shares": 4.5351500,
+  "commission": 0.99,
+  "vat": 0.0065,
+  "fee": null,
+  "sec_fee": null,
+  "taf_fee": null
+}
+
+If there are multiple transactions in the image, return a JSON array: [ {...}, {...} ]
+
+Return ONLY the JSON, no other text.`;
+
 
 const INITIAL_FORM: FormState = {
     side: 'BUY',
@@ -517,27 +541,32 @@ export default function DimeStock() {
                         </button>
 
                         {showJsonPanel && (
-                            <div className="px-3 pb-3 flex flex-col gap-2">
-                                {/* Template */}
-                                <div className="relative">
-                                    <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Template ({form.side})</p>
-                                    <pre className="bg-white border border-amber-200 rounded-lg p-2 text-[10px] text-gray-600 leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
-                                        {JSON.stringify(
-                                            form.side === 'BUY' ? JSON_TEMPLATE_BUY : JSON_TEMPLATE_SELL,
-                                            null, 2
-                                        )}
-                                    </pre>
+                            <div className="px-3 pb-3 flex flex-col gap-3">
+
+                                {/* ── AI Prompt copy card ── */}
+                                <div className="bg-[#001f3f] rounded-xl p-3 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <i className="pi pi-microchip-ai text-amber-300 text-sm" />
+                                            <p className="text-white text-[11px] font-bold">AI OCR Prompt</p>
+                                        </div>
+                                        <span className="text-[10px] text-blue-300">สำหรับ ChatGPT / Claude</span>
+                                    </div>
+                                    <p className="text-blue-200 text-[10px] leading-relaxed">
+                                        Copy prompt นี้แล้วส่งพร้อมรูป slip ให้ AI เพื่อแปลงเป็น JSON
+                                    </p>
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            const tpl = form.side === 'BUY' ? JSON_TEMPLATE_BUY : JSON_TEMPLATE_SELL;
-                                            navigator.clipboard.writeText(JSON.stringify(tpl, null, 2));
+                                            navigator.clipboard.writeText(AI_OCR_PROMPT);
                                         }}
-                                        className="absolute top-5 right-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-0.5 rounded-md font-medium transition-colors"
+                                        className="w-full py-2 rounded-lg text-[11px] font-bold bg-amber-400 hover:bg-amber-300 text-[#001f3f] transition-all flex items-center justify-center gap-1.5"
                                     >
-                                        Copy
+                                        <i className="pi pi-copy" />
+                                        Copy AI Prompt
                                     </button>
                                 </div>
+
 
                                 {/* Paste area */}
                                 <div className="flex flex-col gap-1">
@@ -764,81 +793,88 @@ export default function DimeStock() {
                             <p className="text-xs mt-1 opacity-60">Tap "Add Trade" to get started</p>
                         </div>
                     ) : (
-                        transactions.map((tx) => (
-                            <div
-                                key={tx.id}
-                                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative"
-                            >
-                                {/* Side accent bar */}
-                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                        [...transactions]
+                            .sort((a, b) => {
+                                const dateDiff = b.transaction_date.localeCompare(a.transaction_date);
+                                if (dateDiff !== 0) return dateDiff;
+                                // tiebreak: newest created_at first
+                                return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+                            })
+                            .map((tx) => (
+                                <div
+                                    key={tx.id}
+                                    className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative"
+                                >
+                                    {/* Side accent bar */}
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.side === 'BUY' ? 'bg-blue-500' : 'bg-green-500'}`} />
 
-                                <div className="pl-4 pr-3 pt-3 pb-3">
-                                    {/* Top row */}
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <span className="text-base font-bold text-[#001f3f]">{tx.symbol || '—'}</span>
-                                            <span className="text-[10px] text-gray-400 ml-2">{formatDate(tx.transaction_date)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
+                                    <div className="pl-4 pr-3 pt-3 pb-3">
+                                        {/* Top row */}
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <span className="text-base font-bold text-[#001f3f]">{tx.symbol || '—'}</span>
+                                                <span className="text-[10px] text-gray-400 ml-2">{formatDate(tx.transaction_date)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase
                         ${tx.side === 'BUY' ? 'bg-blue-50 text-blue-600' : tx.side === 'INIT' ? 'bg-purple-50 text-purple-600' : 'bg-green-50 text-green-600'}`}>
-                                                {tx.side}
-                                            </span>
-                                            <button
-                                                onClick={() => setDeleteId(tx.id)}
-                                                className="text-gray-300 hover:text-red-400 transition-colors"
-                                            >
-                                                <i className="pi pi-trash text-xs" />
-                                            </button>
+                                                    {tx.side}
+                                                </span>
+                                                <button
+                                                    onClick={() => setDeleteId(tx.id)}
+                                                    className="text-gray-300 hover:text-red-400 transition-colors"
+                                                >
+                                                    <i className="pi pi-trash text-xs" />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Badge detail row */}
-                                    <div className="flex justify-between items-end mt-2">
-                                        <div className="flex flex-wrap gap-1">
-                                            {tx.shares != null && (
+                                        {/* Badge detail row */}
+                                        <div className="flex justify-between items-end mt-2">
+                                            <div className="flex flex-wrap gap-1">
+                                                {tx.shares != null && (
+                                                    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                        <i className="pi pi-chart-bar text-[8px]" />
+                                                        {Number(tx.shares).toFixed(7)} sh
+                                                    </span>
+                                                )}
                                                 <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                                                    <i className="pi pi-chart-bar text-[8px]" />
-                                                    {Number(tx.shares).toFixed(7)} sh
+                                                    @ {formatUSD(tx.executed_price)}
                                                 </span>
-                                            )}
-                                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                                                @ {formatUSD(tx.executed_price)}
-                                            </span>
-                                            {tx.stock_amount != null && Number(tx.stock_amount) > 0 && (
-                                                <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                                                    Stock {formatUSD(tx.stock_amount)}
-                                                </span>
-                                            )}
-                                            {Number(tx.commission) > 0 && (
-                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">Fee {formatUSD(tx.commission)}</span>
-                                            )}
-                                            {Number(tx.vat) > 0 && (
-                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">VAT {formatUSD(tx.vat)}</span>
-                                            )}
-                                            {Number(tx.sec_fee) > 0 && (
-                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">SEC {formatUSD(tx.sec_fee)}</span>
-                                            )}
-                                            {Number(tx.taf_fee) > 0 && (
-                                                <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">TAF {formatUSD(tx.taf_fee)}</span>
-                                            )}
+                                                {tx.stock_amount != null && Number(tx.stock_amount) > 0 && (
+                                                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                                        Stock {formatUSD(tx.stock_amount)}
+                                                    </span>
+                                                )}
+                                                {Number(tx.commission) > 0 && (
+                                                    <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">Fee {formatUSD(tx.commission)}</span>
+                                                )}
+                                                {Number(tx.vat) > 0 && (
+                                                    <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">VAT {formatUSD(tx.vat)}</span>
+                                                )}
+                                                {Number(tx.sec_fee) > 0 && (
+                                                    <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">SEC {formatUSD(tx.sec_fee)}</span>
+                                                )}
+                                                {Number(tx.taf_fee) > 0 && (
+                                                    <span className="inline-flex items-center bg-orange-50 text-orange-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">TAF {formatUSD(tx.taf_fee)}</span>
+                                                )}
+                                            </div>
+                                            <span className="font-bold text-gray-900 text-base shrink-0 ml-2">{formatUSD(tx.total_amount)}</span>
                                         </div>
-                                        <span className="font-bold text-gray-900 text-base shrink-0 ml-2">{formatUSD(tx.total_amount)}</span>
                                     </div>
-                                </div>
 
-                                {/* Delete confirm */}
-                                {deleteId === tx.id && (
-                                    <div className="bg-red-50 border-t border-red-100 px-4 py-2.5 flex items-center justify-between">
-                                        <span className="text-xs text-red-600 font-medium">Delete this transaction?</span>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setDeleteId(null)} className="text-xs text-gray-500 px-2 py-1 hover:bg-gray-100 rounded">Cancel</button>
-                                            <button onClick={() => handleDelete(tx.id)} className="text-xs text-white bg-red-500 px-3 py-1 rounded-lg font-semibold">Confirm</button>
+                                    {/* Delete confirm */}
+                                    {deleteId === tx.id && (
+                                        <div className="bg-red-50 border-t border-red-100 px-4 py-2.5 flex items-center justify-between">
+                                            <span className="text-xs text-red-600 font-medium">Delete this transaction?</span>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setDeleteId(null)} className="text-xs text-gray-500 px-2 py-1 hover:bg-gray-100 rounded">Cancel</button>
+                                                <button onClick={() => handleDelete(tx.id)} className="text-xs text-white bg-red-500 px-3 py-1 rounded-lg font-semibold">Confirm</button>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))
+                                    )}
+                                </div>
+                            ))
                     )}
                 </div>
             )}
