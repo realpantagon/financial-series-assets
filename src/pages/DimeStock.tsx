@@ -47,7 +47,9 @@ function formatDate(dateString: string): string {
 }
 
 function todayISO(): string {
-    return new Date().toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm" local
 }
 
 // ─── JSON Templates ───────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ Look at the attached stock transaction image/slip and extract the data into JSON
 Rules:
 - side: "BUY" if buying shares, "SELL" if selling shares
 - symbol: stock ticker (e.g. "AAPL", "NVDA")
-- transaction_date: ISO 8601 format "YYYY-MM-DDTHH:mmZ" (use UTC)
+- transaction_date: ISO 8601 format (MUST be converted to Thai Time / UTC+7, e.g., "YYYY-MM-DDTHH:mm:ss+07:00")
 - executed_price: price per share (number)
 - For BUY: use "input_amount_usd" = total USD amount invested (number)
 - For SELL: use "input_shares" = number of shares sold (number)
@@ -73,7 +75,7 @@ BUY format:
 {
   "side": "BUY",
   "symbol": "AAPL",
-  "transaction_date": "2026-02-20T10:30:00Z",
+  "transaction_date": "2026-02-20T17:30:00+07:00",
   "executed_price": 220.50,
   "input_amount_usd": 1000.00,
   "commission": 0.99,
@@ -87,7 +89,7 @@ SELL format:
 {
   "side": "SELL",
   "symbol": "AAPL",
-  "transaction_date": "2026-02-20T10:30:00Z",
+  "transaction_date": "2026-02-20T17:30:00+07:00",
   "executed_price": 220.50,
   "input_shares": 4.5351500,
   "commission": 0.99,
@@ -401,16 +403,21 @@ export default function DimeStock() {
                 if (parsed.symbol) newForm.symbol = String(parsed.symbol).toUpperCase().trim();
                 if (parsed.transaction_date) {
                     const d = new Date(parsed.transaction_date);
-                    if (!isNaN(d.getTime())) newForm.transaction_date = d.toISOString().slice(0, 16);
+                    if (!isNaN(d.getTime())) {
+                        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                        newForm.transaction_date = d.toISOString().slice(0, 16);
+                    }
                 }
                 if (parsed.executed_price != null) newForm.executed_price = String(Math.abs(Number(parsed.executed_price)));
                 if (parsed.input_amount_usd != null) newForm.input_amount_usd = String(parsed.input_amount_usd);
                 if (parsed.input_shares != null) newForm.input_shares = String(parsed.input_shares);
-                if (parsed.commission != null) newForm.commission = String(Math.abs(Number(parsed.commission)));
-                if (parsed.vat != null) newForm.vat = String(Math.abs(Number(parsed.vat)));
-                if (parsed.fee != null) newForm.fee = String(Math.abs(Number(parsed.fee)));
-                if (parsed.sec_fee != null) newForm.sec_fee = String(Math.abs(Number(parsed.sec_fee)));
-                if (parsed.taf_fee != null) newForm.taf_fee = String(Math.abs(Number(parsed.taf_fee)));
+
+                const getFee = (val: any) => (val == null || Number(val) === 0) ? '' : String(Math.abs(Number(val)));
+                newForm.commission = getFee(parsed.commission);
+                newForm.vat = getFee(parsed.vat);
+                newForm.fee = getFee(parsed.fee);
+                newForm.sec_fee = getFee(parsed.sec_fee);
+                newForm.taf_fee = getFee(parsed.taf_fee);
                 setForm(newForm);
                 setJsonSuccess(true);
                 setJsonInput('');
