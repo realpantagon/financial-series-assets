@@ -138,6 +138,7 @@ export default function DimeStock() {
     const [batchPreview, setBatchPreview] = useState<any[] | null>(null);
     const [batchSaving, setBatchSaving] = useState(false);
     const [batchError, setBatchError] = useState<string | null>(null);
+    const [copiedPrompt, setCopiedPrompt] = useState(false);
 
     const [activeTab, setActiveTab] = useState<'transactions' | 'summary'>('summary');
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -395,6 +396,35 @@ export default function DimeStock() {
 
     // ── JSON Auto-fill ─────────────────────────────────────────────────────────
 
+    const handleCopyPrompt = () => {
+        const fallbackCopy = (text: string) => {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                setCopiedPrompt(true);
+                setTimeout(() => setCopiedPrompt(false), 2000);
+            } catch (err) {
+                console.error("Fallback copy failed", err);
+            }
+            document.body.removeChild(textArea);
+        };
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(AI_OCR_PROMPT).then(() => {
+                setCopiedPrompt(true);
+                setTimeout(() => setCopiedPrompt(false), 2000);
+            }).catch(() => fallbackCopy(AI_OCR_PROMPT));
+        } else {
+            fallbackCopy(AI_OCR_PROMPT);
+        }
+    };
+
     const applyJson = () => {
         setJsonError(null);
         setJsonSuccess(false);
@@ -404,6 +434,9 @@ export default function DimeStock() {
             let raw = jsonInput.trim();
             // Strip markdown fences
             raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+            // Normalize all smart/fancy quotes to standard quotes before JSON decode
+            raw = raw.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+            raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
 
             // Try array first
             const arrMatch = raw.match(/\[[\s\S]*\]/);
@@ -593,13 +626,11 @@ export default function DimeStock() {
                                     </p>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(AI_OCR_PROMPT);
-                                        }}
+                                        onClick={handleCopyPrompt}
                                         className="w-full py-2 rounded-lg text-[11px] font-bold bg-amber-400 hover:bg-amber-300 text-[#001f3f] transition-all flex items-center justify-center gap-1.5"
                                     >
-                                        <i className="pi pi-copy" />
-                                        Copy AI Prompt
+                                        <i className={`pi ${copiedPrompt ? 'pi-check text-green-700' : 'pi-copy'}`} />
+                                        {copiedPrompt ? 'Copied!' : 'Copy AI Prompt'}
                                     </button>
                                 </div>
 
@@ -614,6 +645,10 @@ export default function DimeStock() {
                                         onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); setBatchPreview(null); setJsonSuccess(false); }}
                                         placeholder={`{ ... }  or  [ { ... }, { ... } ]`}
                                         rows={5}
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        autoComplete="off"
+                                        spellCheck="false"
                                         className="border border-amber-200 bg-white rounded-lg px-3 py-2 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
                                     />
                                 </div>
