@@ -15,6 +15,22 @@ body {
     /* gray-800 */
 }
 
+/* ── iOS PWA: prevent auto-zoom on input focus ───────────────────────────── */
+/* iOS Safari zooms when font-size < 16px — force 16px on all form elements  */
+input,
+textarea,
+select {
+    font-size: 16px !important;
+}
+
+/* Remove 300ms tap delay on buttons / links */
+button,
+a,
+[role="button"] {
+    touch-action: manipulation;
+}
+
+
 /* Custom scrollbar for webkit */
 ::-webkit-scrollbar {
     width: 8px;
