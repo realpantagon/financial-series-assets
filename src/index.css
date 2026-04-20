@@ -1,50 +1,96 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-    --primary-color: #001f3f;
-    --surface-ground: #f4f6f9;
+/* Safe area padding for mobile PWA */
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-body {
-    margin: 0;
-    font-family: 'Inter', sans-serif;
-    background-color: var(--surface-ground);
-    color: #1f2937;
-    /* gray-800 */
-}
-
-/* ── iOS PWA: prevent auto-zoom on input focus ───────────────────────────── */
-/* iOS Safari zooms when font-size < 16px — force 16px on all form elements  */
+/* ── iOS PWA: prevent auto-zoom on input focus ── */
 input,
 textarea,
 select {
     font-size: 16px !important;
 }
 
-/* Remove 300ms tap delay on buttons / links */
 button,
 a,
 [role="button"] {
     touch-action: manipulation;
 }
 
+/* Thin custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.35 0.04 255); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0.06 255); }
 
-/* Custom scrollbar for webkit */
-::-webkit-scrollbar {
-    width: 8px;
-}
+@layer base {
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+  }
 
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
+  :root {
+    /* ── Dark Financial / Tech Terminal Theme ── */
+    --background: 0.1 0.03 255;          /* #090e1a deep dark blue-black */
+    --foreground: 0.92 0.01 250;         /* near-white with blue tint */
+    --card: 0.14 0.025 255;              /* #0f1724 dark card */
+    --card-foreground: 0.92 0.01 250;
+    --popover: 0.16 0.025 255;
+    --popover-foreground: 0.92 0.01 250;
+    --primary: 0.62 0.22 258;            /* electric blue #3b82f6-ish */
+    --primary-foreground: 0.98 0 0;      /* white */
+    --secondary: 0.18 0.025 255;         /* dark secondary bg */
+    --secondary-foreground: 0.92 0.01 250;
+    --muted: 0.18 0.02 255;              /* dark muted bg */
+    --muted-foreground: 0.52 0.03 255;   /* medium gray-blue */
+    --accent: 0.2 0.025 255;             /* hover state bg */
+    --accent-foreground: 0.92 0.01 250;
+    --destructive: 0.63 0.23 27;         /* red */
+    --border: 0.24 0.035 255;            /* subtle dark border */
+    --input: 0.17 0.02 255;              /* input bg */
+    --ring: 0.62 0.22 258;              /* blue focus ring */
+    --chart-1: 0.62 0.22 258;           /* blue */
+    --chart-2: 0.63 0.18 145;           /* emerald green */
+    --chart-3: 0.72 0.18 60;            /* amber */
+    --chart-4: 0.62 0.18 300;           /* purple */
+    --chart-5: 0.72 0.14 25;            /* orange */
+    --radius: 0.625rem;
+    --sidebar: 0.12 0.025 255;
+    --sidebar-foreground: 0.92 0.01 250;
+    --sidebar-primary: 0.62 0.22 258;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.18 0.02 255;
+    --sidebar-accent-foreground: 0.92 0.01 250;
+    --sidebar-border: 0.24 0.035 255;
+    --sidebar-ring: 0.62 0.22 258;
+  }
 
-::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  body {
+    @apply bg-background text-foreground;
+    /* Subtle dot grid for terminal feel */
+    background-image: radial-gradient(circle, oklch(0.62 0.22 258 / 0.04) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  /* Monospace numbers utility */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-family: 'Geist Variable', 'JetBrains Mono', monospace;
+  }
 }

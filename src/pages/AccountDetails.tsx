@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { PantagonAsset } from '../types';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import { ArrowLeft, Plus, ArrowDownLeft, ArrowUpRight, TrendingDown, TrendingUp } from 'lucide-react';
 
 export default function AccountDetails() {
     const { accountName } = useParams<{ accountName: string }>();
@@ -10,21 +15,18 @@ export default function AccountDetails() {
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState({ total: 0, in: 0, out: 0 });
 
-    // Helper to get icon based on account name
-    const getAccountIcon = (accountName: string): string | undefined => {
-        const lowerName = accountName.toLowerCase();
-        if (lowerName.includes('scb')) return '/scb.jpg';
-        if (lowerName.includes('dime')) return '/Dime.png';
-        if (lowerName.includes('kbank') || lowerName.includes('make')) return '/kbank.png';
-        if (lowerName.includes('ttb')) return '/ttb.png';
-        if (lowerName.includes('sso')) return '/SSO.jpg';
+    const getAccountIcon = (name: string): string | undefined => {
+        const lower = name.toLowerCase();
+        if (lower.includes('scb')) return '/scb.jpg';
+        if (lower.includes('dime')) return '/Dime.png';
+        if (lower.includes('kbank') || lower.includes('make')) return '/kbank.png';
+        if (lower.includes('ttb')) return '/ttb.png';
+        if (lower.includes('sso')) return '/SSO.jpg';
         return undefined;
     };
 
     useEffect(() => {
-        if (accountName) {
-            fetchAccountAssets(accountName);
-        }
+        if (accountName) fetchAccountAssets(accountName);
     }, [accountName]);
 
     const fetchAccountAssets = async (name: string) => {
@@ -36,9 +38,7 @@ export default function AccountDetails() {
             .order('date', { ascending: false })
             .order('id', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching account assets:', error);
-        } else {
+        if (!error) {
             const fetchedAssets = data || [];
             setAssets(fetchedAssets);
             calculateSummary(fetchedAssets);
@@ -47,123 +47,164 @@ export default function AccountDetails() {
     };
 
     const calculateSummary = (data: PantagonAsset[]) => {
-        let total = 0;
-        let totalIn = 0;
-        let totalOut = 0;
-
+        let total = 0, totalIn = 0, totalOut = 0;
         data.forEach(item => {
             const amount = Number(item.amount);
-            if (item.type === 'IN') {
-                total += amount;
-                totalIn += amount;
-            } else {
-                total -= amount;
-                totalOut += amount;
-            }
+            if (item.type === 'IN') { total += amount; totalIn += amount; }
+            else { total -= amount; totalOut += amount; }
         });
-
         setSummary({ total, in: totalIn, out: totalOut });
     };
 
-    const formatCurrency = (value: number) => {
-        return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-    };
+    const formatCurrency = (value: number) =>
+        value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
+        return new Date(dateString).toLocaleDateString('en-GB', {
+            day: 'numeric', month: 'short', year: 'numeric'
         });
     };
 
     if (loading) {
-        return <div className="flex justify-center items-center min-h-screen text-gray-500 font-sans">Loading details...</div>;
+        return (
+            <div className="flex flex-col gap-4 pt-4 pb-20">
+                <div className="flex items-center gap-3">
+                    <Skeleton className="size-10 rounded-full" />
+                    <Skeleton className="h-6 w-40" />
+                </div>
+                <Skeleton className="h-28 w-full rounded-2xl" />
+                <div className="flex flex-col gap-2">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+                </div>
+            </div>
+        );
     }
 
+    const icon = accountName ? getAccountIcon(accountName) : undefined;
+
     return (
-        <div className="flex flex-col gap-6 max-w-lg mx-auto pb-24">
-            {/* Header / Summary Section */}
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-gray-600 shadow-sm hover:bg-gray-50 transition-colors border border-gray-100"
-                    >
-                        <i className="pi pi-arrow-left"></i>
-                    </button>
+        <div className="flex flex-col gap-4 pb-24 pt-4">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigate('/')}
+                    className="size-9 rounded-full shrink-0"
+                >
+                    <ArrowLeft className="size-4" />
+                </Button>
 
-                    {accountName && getAccountIcon(accountName) && (
-                        <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm border border-gray-100 flex-shrink-0 bg-white flex items-center justify-center">
-                            <img
-                                src={getAccountIcon(accountName)}
-                                alt={accountName}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                            />
+                {icon && (
+                    <div className="size-9 rounded-full overflow-hidden border border-border/50 bg-muted flex-shrink-0">
+                        <img src={icon} alt={accountName} className="w-full h-full object-cover" />
+                    </div>
+                )}
+
+                <h2 className="text-lg font-bold text-foreground leading-snug truncate">{accountName}</h2>
+            </div>
+
+            {/* Balance Card */}
+            <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-card to-blue-500/5 p-5 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 to-transparent pointer-events-none" />
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold mb-1 relative">
+                    Total Balance
+                </p>
+                <p className="font-mono font-bold text-3xl text-foreground tracking-tight relative">{formatCurrency(summary.total)}</p>
+
+                <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border/20 relative">
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                            <TrendingUp className="size-3 text-emerald-400" />
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Total In</span>
                         </div>
-                    )}
-
-                    <h2 className="text-xl font-bold text-[#001f3f] m-0">{accountName}</h2>
-                </div>
-
-                <div className="bg-white shadow-sm rounded-2xl p-6 border border-gray-100 flex flex-col items-center justify-center">
-                    <div className="text-gray-400 text-xs font-bold uppercase tracking-wide mb-1">Total Balance</div>
-                    <div className="text-[#001f3f] font-extrabold text-3xl">{formatCurrency(summary.total)}</div>
+                        <p className="text-base font-mono font-semibold text-emerald-400">{formatCurrency(summary.in)}</p>
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                            <TrendingDown className="size-3 text-rose-400" />
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Total Out</span>
+                        </div>
+                        <p className="text-base font-mono font-semibold text-rose-400">{formatCurrency(summary.out)}</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Transactions List */}
-            <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center px-2">
-                    <h3 className="text-lg font-bold text-gray-800">Transactions</h3>
-                    <button
+            {/* Transactions */}
+            <div className="flex flex-col gap-2.5">
+                <div className="flex justify-between items-center px-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {assets.length} Transactions
+                    </span>
+                    <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => navigate('/add', { state: { accountName } })}
-                        className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors"
+                        className="h-7 text-xs gap-1"
                     >
-                        <i className="pi pi-plus text-[10px]"></i>
-                        <span>Add</span>
-                    </button>
+                        <Plus className="size-3" />
+                        Add
+                    </Button>
                 </div>
 
-                <div className="flex flex-col gap-0 backdrop-blur-sm">
-                    {assets.map((item) => (
-                        <div key={item.id} className="bg-white p-4 border-b border-gray-100 last:border-0 first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-4">
-                                {/* Icon */}
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.type === 'IN' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                    <i className={`pi ${item.type === 'IN' ? 'pi-arrow-down-left' : 'pi-arrow-up-right'} text-lg`}></i>
+                {assets.length === 0 ? (
+                    <div className="border border-dashed border-border/30 rounded-xl py-10 text-center text-muted-foreground text-sm">
+                        No transactions for this account.
+                    </div>
+                ) : (
+                    <div className="rounded-xl overflow-hidden border border-border/30 bg-card/60">
+                        {assets.map((item, idx) => {
+                            const isIn = item.type === 'IN';
+                            return (
+                                <div key={item.id}>
+                                    <div className="px-4 py-3 flex items-center justify-between hover:bg-white/2 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn(
+                                                'size-9 rounded-full flex items-center justify-center flex-shrink-0 border',
+                                                isIn
+                                                    ? 'bg-emerald-500/10 border-emerald-500/20'
+                                                    : 'bg-rose-500/10 border-rose-500/20'
+                                            )}>
+                                                {isIn
+                                                    ? <ArrowDownLeft className="size-4 text-emerald-400" />
+                                                    : <ArrowUpRight className="size-4 text-rose-400" />
+                                                }
+                                            </div>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="font-semibold text-foreground text-sm leading-snug line-clamp-1">
+                                                    {item.tag || (isIn ? 'Income' : 'Expense')}
+                                                </span>
+                                                <span className="text-muted-foreground text-[11px] font-mono">
+                                                    {formatDate(item.date)}
+                                                    {item.note && ` · ${item.note}`}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col items-end gap-1 pl-2 shrink-0">
+                                            <span className={cn(
+                                                'font-mono font-bold text-sm',
+                                                isIn ? 'text-emerald-400' : 'text-foreground'
+                                            )}>
+                                                {isIn ? '+' : '-'}{formatCurrency(Number(item.amount))}
+                                            </span>
+                                            <span className={cn(
+                                                'text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                                                isIn
+                                                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                                    : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                            )}>
+                                                {isIn ? 'IN' : 'OUT'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {idx < assets.length - 1 && <Separator className="mx-4 w-auto opacity-20" />}
                                 </div>
-
-                                {/* Info */}
-                                <div className="flex flex-col items-start gap-0.5">
-                                    <span className="font-bold text-gray-800 text-sm text-left line-clamp-1">
-                                        {item.tag || (item.type === 'IN' ? 'Income' : 'Expense')}
-                                    </span>
-                                    <span className="text-gray-400 text-xs text-left">
-                                        {formatDate(item.date)}
-                                        {item.note ? ` • ${item.note}` : ''}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Amount */}
-                            <div className={`font-bold text-sm ${item.type === 'IN' ? 'text-green-600' : 'text-gray-900'}`}>
-                                {item.type === 'IN' ? '+' : '-'}{formatCurrency(Number(item.amount))}
-                            </div>
-                        </div>
-                    ))}
-
-                    {assets.length === 0 && (
-                        <div className="bg-white p-8 rounded-2xl text-center text-gray-500 text-sm">
-                            No transactions found for this account.
-                        </div>
-                    )}
-                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );

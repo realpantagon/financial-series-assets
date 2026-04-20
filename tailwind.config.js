@@ -7,20 +7,47 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: '#001f3f', // Navy Blue
-                secondary: '#003366', // Lighter Navy
-                accent: '#3949ab',    // Indigo
-                success: '#43a047',   // Green
-                danger: '#d81b60',    // Pink/Red for expenses
-                surface: {
-                    ground: '#f4f6f9',
-                    card: '#ffffff',
-                    hover: '#f8f9fa'
-                }
+                // shadcn CSS variable mappings
+                background: 'oklch(var(--background) / <alpha-value>)',
+                foreground: 'oklch(var(--foreground) / <alpha-value>)',
+                card: {
+                    DEFAULT: 'oklch(var(--card) / <alpha-value>)',
+                    foreground: 'oklch(var(--card-foreground) / <alpha-value>)',
+                },
+                primary: {
+                    DEFAULT: 'oklch(var(--primary) / <alpha-value>)',
+                    foreground: 'oklch(var(--primary-foreground) / <alpha-value>)',
+                },
+                secondary: {
+                    DEFAULT: 'oklch(var(--secondary) / <alpha-value>)',
+                    foreground: 'oklch(var(--secondary-foreground) / <alpha-value>)',
+                },
+                muted: {
+                    DEFAULT: 'oklch(var(--muted) / <alpha-value>)',
+                    foreground: 'oklch(var(--muted-foreground) / <alpha-value>)',
+                },
+                accent: {
+                    DEFAULT: 'oklch(var(--accent) / <alpha-value>)',
+                    foreground: 'oklch(var(--accent-foreground) / <alpha-value>)',
+                },
+                destructive: {
+                    DEFAULT: 'oklch(var(--destructive) / <alpha-value>)',
+                },
+                border: 'oklch(var(--border) / <alpha-value>)',
+                input: 'oklch(var(--input) / <alpha-value>)',
+                ring: 'oklch(var(--ring) / <alpha-value>)',
+                // Custom financial colors (raw values for direct use)
+                success: '#43a047',
+                danger: '#d81b60',
+            },
+            borderRadius: {
+                lg: 'var(--radius)',
+                md: 'calc(var(--radius) - 2px)',
+                sm: 'calc(var(--radius) - 4px)',
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
-            }
+                sans: ['Geist Variable', 'Inter', 'sans-serif'],
+            },
         },
     },
     plugins: [],

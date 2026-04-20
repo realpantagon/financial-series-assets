@@ -1,17 +1,17 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import AddTransaction from './pages/AddTransaction';
-import AccountDetails from './pages/AccountDetails';
-import Transactions from './pages/Transactions';
-import FXPage from './pages/FXPage';
-import FXAnalytics from './pages/FXAnalytics';
-import DimeStock from './pages/DimeStock';
-import './App.css';
+import { Toaster } from 'sonner';
+import Dashboard from '@/pages/Dashboard';
+import AddTransaction from '@/pages/AddTransaction';
+import AccountDetails from '@/pages/AccountDetails';
+import Transactions from '@/pages/Transactions';
+import FXPage from '@/pages/FXPage';
+import FXAnalytics from '@/pages/FXAnalytics';
+import DimeStock from '@/pages/DimeStock';
+import { cn } from '@/lib/utils';
+import { Home, List, DollarSign, TrendingUp } from 'lucide-react';
 
-function NavItem({ to, label, icon }: { to: string, label: string, icon: string }) {
+function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
     const location = useLocation();
-
-    // Check if active: exact match for home, startsWith for others to catch sub-routes
     const isActive = to === '/'
         ? location.pathname === '/'
         : location.pathname.startsWith(to);
@@ -19,10 +19,24 @@ function NavItem({ to, label, icon }: { to: string, label: string, icon: string 
     return (
         <Link
             to={to}
-            className={`flex flex-col items-center justify-center gap-1 w-full py-3 pb-2 transition-colors z-10 ${isActive ? 'text-[#001f3f]' : 'text-gray-400 hover:text-gray-600'}`}
+            className={cn(
+                'flex flex-col items-center justify-center gap-1 w-full py-3 pb-2 transition-colors',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            )}
         >
-            <i className={`${icon} text-xl ${isActive ? 'font-bold' : ''}`}></i>
-            <span className="text-[10px] font-medium">{label}</span>
+            <Icon
+                className={cn('size-5', isActive && 'stroke-[2.5]')}
+                strokeWidth={isActive ? 2.5 : 1.8}
+            />
+            <span className={cn(
+                'text-[10px] font-medium',
+                isActive ? 'font-semibold' : 'font-normal'
+            )}>
+                {label}
+            </span>
+            {isActive && (
+                <span className="absolute bottom-0 block h-0.5 w-8 rounded-full bg-primary" />
+            )}
         </Link>
     );
 }
@@ -30,55 +44,45 @@ function NavItem({ to, label, icon }: { to: string, label: string, icon: string 
 function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-            <div className="mx-auto max-w-lg bg-white shadow-[0_-4px_6px_rgba(0,0,0,0.05)]">
-                <div className="grid grid-cols-4 h-[84px] items-center">
-                    <NavItem
-                        to="/"
-                        label="Dashboard"
-                        icon="pi pi-home"
-                    />
-
-                    <NavItem
-                        to="/transactions"
-                        label="Transactions"
-                        icon="pi pi-list"
-                    />
-
-                    <NavItem
-                        to="/fx"
-                        label="FX"
-                        icon="pi pi-dollar"
-                    />
-
-                    <NavItem
-                        to="/dime-stock"
-                        label="Dime Stock"
-                        icon="pi pi-chart-line"
-                    />
+            <div className="mx-auto max-w-lg bg-card border-t border-border shadow-lg">
+                <div className="grid grid-cols-4 h-[68px] items-center relative">
+                    <NavItem to="/" label="Dashboard" icon={Home} />
+                    <NavItem to="/transactions" label="History" icon={List} />
+                    <NavItem to="/fx" label="FX" icon={DollarSign} />
+                    <NavItem to="/dime-stock" label="Stocks" icon={TrendingUp} />
                 </div>
             </div>
         </div>
     );
 }
 
-
-
 function Header() {
     return (
-        <div className="bg-surface-ground sticky top-0 z-40">
-            <div className="max-w-lg mx-auto px-6 py-2 flex justify-between items-center">
-                <span className="text-2xl font-bold text-[#001f3f]">Pantagon Assets</span>
+        <div className="bg-card border-b border-border sticky top-0 z-40">
+            <div className="max-w-lg mx-auto px-5 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-2.5">
+                    <div className="size-7 rounded-md bg-primary flex items-center justify-center">
+                        <TrendingUp className="size-4 text-primary-foreground" strokeWidth={2.5} />
+                    </div>
+                    <span className="text-lg font-bold text-foreground tracking-tight">PanAssets</span>
+                </div>
+                <Link
+                    to="/add"
+                    className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors"
+                >
+                    + Add
+                </Link>
             </div>
         </div>
-    )
+    );
 }
 
 function App() {
     return (
         <BrowserRouter>
-            <div className="min-h-screen flex flex-col bg-surface-ground">
+            <div className="min-h-screen flex flex-col bg-background">
                 <Header />
-                <div className="flex-1 w-full max-w-lg mx-auto p-2 pb-28">
+                <div className="flex-1 w-full max-w-lg mx-auto p-3 pb-28">
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/add" element={<AddTransaction />} />
@@ -90,6 +94,7 @@ function App() {
                     </Routes>
                 </div>
                 <BottomNav />
+                <Toaster position="top-center" richColors />
             </div>
         </BrowserRouter>
     );
