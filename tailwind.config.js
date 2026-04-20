@@ -46,7 +46,8 @@ export default {
                 sm: 'calc(var(--radius) - 4px)',
             },
             fontFamily: {
-                sans: ['Geist Variable', 'Inter', 'sans-serif'],
+                sans: ['JetBrains Mono', 'monospace'],
+                mono: ['JetBrains Mono', 'monospace'],
             },
         },
     },

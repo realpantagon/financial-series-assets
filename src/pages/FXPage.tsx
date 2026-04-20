@@ -149,33 +149,38 @@ export default function FXPage() {
         <div className="flex flex-col gap-4 pb-24 pt-4">
             {/* Header */}
             <div className="flex justify-between items-center">
-                <h1 className="text-xl font-bold text-foreground">FX Transactions</h1>
-                <div className="flex gap-2">
+                <div>
+                    <h1 className="font-black text-lg text-foreground tracking-tighter">FX</h1>
+                    <span className="text-[9px] text-muted-foreground/40 font-mono tracking-wider">{data.length} records</span>
+                </div>
+                <div className="flex gap-1.5">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => navigate('/fx/analytics')}
-                        className="gap-1.5 text-xs"
+                        className="gap-1.5 text-[10px] font-bold border-border/30 bg-transparent hover:bg-white/3 tracking-wider h-8 px-3"
                     >
-                        <BarChart2 className="size-3.5" />
-                        Analytics
+                        <BarChart2 className="size-3" />
+                        ANALYTICS
                     </Button>
                     <Button
                         size="sm"
-                        variant={showForm ? 'outline' : 'default'}
                         onClick={() => setShowForm(!showForm)}
-                        className="gap-1.5 text-xs"
+                        className={showForm
+                            ? 'gap-1.5 text-[10px] font-bold border border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/15 shadow-none h-8 px-3 tracking-wider'
+                            : 'gap-1.5 text-[10px] font-bold border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/15 shadow-none h-8 px-3 tracking-wider'
+                        }
                     >
-                        {showForm ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
-                        {showForm ? 'Cancel' : 'Add FX'}
+                        {showForm ? <X className="size-3" /> : <Plus className="size-3" />}
+                        {showForm ? 'CANCEL' : 'ADD FX'}
                     </Button>
                 </div>
             </div>
 
             {/* Add Form */}
             {showForm && (
-                <div className="rounded-xl border border-border/30 bg-card/60 p-4 animate-in slide-in-from-top-2 duration-200">
-                        <h2 className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">Add Foreign Exchange</h2>
+                <div className="rounded-xl border border-border/25 bg-[oklch(0.12_0.015_255)] p-4 animate-in slide-in-from-top-2 duration-200">
+                        <h2 className="text-[9px] uppercase tracking-[0.14em] font-bold text-muted-foreground/40 mb-3">ADD FOREIGN EXCHANGE</h2>
                         <form onSubmit={handleSave} className="flex flex-col gap-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="flex flex-col gap-1.5">
@@ -250,7 +255,7 @@ export default function FXPage() {
             {/* Month Selector */}
             {!showForm && (
                 <>
-                    <div className="flex items-center justify-between bg-card/60 border border-border/30 rounded-xl p-2">
+                    <div className="flex items-center justify-between bg-[oklch(0.12_0.015_255)] border border-border/20 rounded-xl p-2">
                         <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="size-9">
                             <ChevronLeft className="size-4" />
                         </Button>
@@ -296,9 +301,9 @@ export default function FXPage() {
 
                     {/* Transaction List */}
                     {filteredData.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-14 text-muted-foreground gap-3 bg-card rounded-2xl border border-dashed border-border">
-                            <Inbox className="size-10 opacity-30" />
-                            <p className="text-sm">No transactions for this period</p>
+                        <div className="flex flex-col items-center justify-center py-14 text-muted-foreground/30 gap-3 rounded-2xl border border-dashed border-border/20">
+                            <Inbox className="size-8 opacity-30" />
+                            <p className="text-[10px] tracking-wider">NO TRANSACTIONS FOR THIS PERIOD</p>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2">
@@ -306,7 +311,7 @@ export default function FXPage() {
                                 const isIn = item.to_currency === 'USD';
                                 const isOut = item.from_currency === 'USD';
                                 return (
-                                    <div key={item.id} className="rounded-xl border border-border/30 bg-card/60 overflow-hidden">
+                                    <div key={item.id} className="rounded-xl border border-border/20 bg-[oklch(0.12_0.015_255)] overflow-hidden">
                                         <div className={cn(
                                             'w-full h-0.5',
                                             isIn ? 'bg-emerald-500/70' : isOut ? 'bg-rose-500/70' : 'bg-border/50'
@@ -354,8 +359,8 @@ export default function FXPage() {
                         </div>
                     )}
 
-                    <p className="text-center text-xs text-muted-foreground pb-2">
-                        {filteredData.length} transaction{filteredData.length !== 1 ? 's' : ''}
+                    <p className="text-center text-[9px] font-mono text-muted-foreground/30 tracking-wider pb-2">
+                        {filteredData.length} TRANSACTION{filteredData.length !== 1 ? 'S' : ''}
                     </p>
                 </>
             )}

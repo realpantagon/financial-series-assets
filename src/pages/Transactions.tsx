@@ -47,10 +47,8 @@ export default function Transactions() {
 
     const totalPages = Math.max(1, Math.ceil(assets.length / PAGE_SIZE));
     const paged = assets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
     const goTo = (p: number) => setPage(Math.min(Math.max(1, p), totalPages));
 
-    // Page window: show up to 5 page buttons
     const pageWindow = () => {
         const radius = 2;
         let start = Math.max(1, page - radius);
@@ -68,13 +66,13 @@ export default function Transactions() {
         return (
             <div className="flex flex-col gap-0 pt-4 pb-20">
                 {[1,2,3,4,5,6,7].map(i => (
-                    <div key={i} className="px-4 py-3.5 border-b border-border/20 flex items-center gap-3">
-                        <Skeleton className="size-9 rounded-full shrink-0" />
+                    <div key={i} className="px-3 py-3 border-b border-border/15 flex items-center gap-3">
+                        <Skeleton className="size-8 rounded-full shrink-0" />
                         <div className="flex-1 flex flex-col gap-1.5">
-                            <Skeleton className="h-3 w-32" />
-                            <Skeleton className="h-2.5 w-20" />
+                            <Skeleton className="h-3 w-28" />
+                            <Skeleton className="h-2.5 w-16" />
                         </div>
-                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-14" />
                     </div>
                 ))}
             </div>
@@ -85,21 +83,21 @@ export default function Transactions() {
         <div className="flex flex-col gap-3 pb-24 pt-4">
             {/* Stats bar */}
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-mono text-muted-foreground">
-                    {assets.length} transactions
+                <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">
+                    {assets.length} TRANSACTIONS
                 </span>
                 {totalPages > 1 && (
-                    <span className="text-[11px] font-mono text-muted-foreground">
-                        page {page} / {totalPages}
+                    <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">
+                        {page} / {totalPages}
                     </span>
                 )}
             </div>
 
             {/* List */}
-            <div className="rounded-xl border border-border/30 bg-card/60 overflow-hidden">
+            <div className="rounded-xl border border-border/20 bg-[oklch(0.11_0.014_255/0.7)] overflow-hidden">
                 {paged.length === 0 ? (
-                    <div className="py-16 text-center text-muted-foreground text-sm">
-                        No transactions found.
+                    <div className="py-16 text-center text-muted-foreground/30 text-[10px] tracking-wider">
+                        NO TRANSACTIONS FOUND
                     </div>
                 ) : (
                     paged.map((item, idx) => {
@@ -110,52 +108,52 @@ export default function Transactions() {
                             <div
                                 key={item.id}
                                 className={cn(
-                                    'flex items-center gap-3 px-4 py-3 hover:bg-white/2 transition-colors',
-                                    idx < paged.length - 1 && 'border-b border-border/20'
+                                    'flex items-center gap-3 px-3 py-2.5 hover:bg-white/1 transition-colors',
+                                    idx < paged.length - 1 && 'border-b border-border/15'
                                 )}
                             >
                                 {/* Icon */}
                                 <div className={cn(
-                                    'size-9 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center border',
-                                    icon ? 'border-border/30 bg-muted/40' : isIn ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-rose-500/20 bg-rose-500/10'
+                                    'size-8 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center border',
+                                    icon ? 'border-border/20 bg-black/20' : isIn ? 'border-emerald-500/15 bg-emerald-500/8' : 'border-rose-500/15 bg-rose-500/8'
                                 )}>
                                     {icon ? (
                                         <>
                                             <img src={icon} alt={item.account_name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
-                                            <Wallet className="size-4 text-muted-foreground hidden" />
+                                            <Wallet className="size-3.5 text-muted-foreground/40 hidden" />
                                         </>
                                     ) : isIn ? (
-                                        <ArrowDownLeft className="size-4 text-emerald-400" />
+                                        <ArrowDownLeft className="size-3.5 text-emerald-400" />
                                     ) : (
-                                        <ArrowUpRight className="size-4 text-rose-400" />
+                                        <ArrowUpRight className="size-3.5 text-rose-400" />
                                     )}
                                 </div>
 
                                 {/* Info */}
                                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                                    <span className="font-semibold text-foreground text-sm truncate leading-snug">
+                                    <span className="font-bold text-foreground text-sm truncate leading-snug">
                                         {item.tag || item.account_name}
                                     </span>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[11px] font-mono text-muted-foreground">{formatDate(item.date)}</span>
-                                        <span className="text-muted-foreground/30 text-[10px]">·</span>
-                                        <span className="text-[11px] text-muted-foreground truncate max-w-[90px]">{item.account_name}</span>
+                                        <span className="text-[9px] font-mono text-muted-foreground/40">{formatDate(item.date)}</span>
+                                        <span className="text-muted-foreground/20 text-[9px]">·</span>
+                                        <span className="text-[9px] text-muted-foreground/30 truncate max-w-[80px]">{item.account_name}</span>
                                     </div>
                                 </div>
 
                                 {/* Amount */}
-                                <div className="flex flex-col items-end gap-1 shrink-0 pl-2">
+                                <div className="flex flex-col items-end gap-0.5 shrink-0 pl-2">
                                     <span className={cn(
-                                        'font-mono font-bold text-sm',
-                                        isIn ? 'text-emerald-400' : 'text-foreground'
+                                        'font-mono font-black text-sm',
+                                        isIn ? 'text-emerald-400' : 'text-foreground/80'
                                     )}>
                                         {isIn ? '+' : '-'}{formatCurrency(Number(item.amount))}
                                     </span>
                                     <span className={cn(
-                                        'text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                                        'text-[8px] font-bold px-1 py-0.5 rounded border tracking-wider',
                                         isIn
-                                            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                            : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                            ? 'text-emerald-400/70 bg-emerald-500/8 border-emerald-500/15'
+                                            : 'text-rose-400/70 bg-rose-500/8 border-rose-500/15'
                                     )}>
                                         {isIn ? 'IN' : 'OUT'}
                                     </span>
@@ -168,15 +166,15 @@ export default function Transactions() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-1.5 pt-1">
+                <div className="flex items-center justify-center gap-1 pt-1">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => goTo(page - 1)}
                         disabled={page === 1}
-                        className="size-8 text-muted-foreground hover:text-foreground"
+                        className="size-7 text-muted-foreground/50 hover:text-foreground"
                     >
-                        <ChevronLeft className="size-4" />
+                        <ChevronLeft className="size-3.5" />
                     </Button>
 
                     {pageWindow().map(p => (
@@ -186,10 +184,10 @@ export default function Transactions() {
                             size="icon"
                             onClick={() => goTo(p)}
                             className={cn(
-                                'size-8 text-xs font-mono',
+                                'size-7 text-[10px] font-mono font-bold',
                                 p === page
-                                    ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/25 shadow-none'
-                                    : 'text-muted-foreground hover:text-foreground'
+                                    ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 hover:bg-cyan-500/15 shadow-none'
+                                    : 'text-muted-foreground/40 hover:text-foreground'
                             )}
                         >
                             {p}
@@ -201,9 +199,9 @@ export default function Transactions() {
                         size="icon"
                         onClick={() => goTo(page + 1)}
                         disabled={page === totalPages}
-                        className="size-8 text-muted-foreground hover:text-foreground"
+                        className="size-7 text-muted-foreground/50 hover:text-foreground"
                     >
-                        <ChevronRight className="size-4" />
+                        <ChevronRight className="size-3.5" />
                     </Button>
                 </div>
             )}

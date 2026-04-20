@@ -1,75 +1,83 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Safe area padding for mobile PWA */
+/* ── Safe area for mobile PWA ── */
 .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── iOS PWA: prevent auto-zoom on input focus ── */
-input,
-textarea,
-select {
+/* ── iOS: prevent auto-zoom on input focus ── */
+input, textarea, select {
     font-size: 16px !important;
 }
 
-button,
-a,
-[role="button"] {
+button, a, [role="button"] {
     touch-action: manipulation;
 }
 
-/* Thin custom scrollbar */
-::-webkit-scrollbar { width: 4px; }
+/* ── Thin scrollbar ── */
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.35 0.04 255); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0.06 255); }
+::-webkit-scrollbar-thumb { background: oklch(0.28 0.04 240); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.4 0.1 210); }
+
+/* ── Bottom sheet modal animation ── */
+@keyframes sheet-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes sheet-down {
+    from { transform: translateY(0);    opacity: 1; }
+    to   { transform: translateY(100%); opacity: 0; }
+}
+@keyframes backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.animate-sheet-up   { animation: sheet-up   0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-sheet-down { animation: sheet-down 0.22s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.animate-backdrop   { animation: backdrop-in 0.2s ease forwards; }
 
 @layer base {
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
-  }
-
   :root {
-    /* ── Dark Financial / Tech Terminal Theme ── */
-    --background: 0.1 0.03 255;          /* #090e1a deep dark blue-black */
-    --foreground: 0.92 0.01 250;         /* near-white with blue tint */
-    --card: 0.14 0.025 255;              /* #0f1724 dark card */
-    --card-foreground: 0.92 0.01 250;
-    --popover: 0.16 0.025 255;
-    --popover-foreground: 0.92 0.01 250;
-    --primary: 0.62 0.22 258;            /* electric blue #3b82f6-ish */
-    --primary-foreground: 0.98 0 0;      /* white */
-    --secondary: 0.18 0.025 255;         /* dark secondary bg */
-    --secondary-foreground: 0.92 0.01 250;
-    --muted: 0.18 0.02 255;              /* dark muted bg */
-    --muted-foreground: 0.52 0.03 255;   /* medium gray-blue */
-    --accent: 0.2 0.025 255;             /* hover state bg */
-    --accent-foreground: 0.92 0.01 250;
-    --destructive: 0.63 0.23 27;         /* red */
-    --border: 0.24 0.035 255;            /* subtle dark border */
-    --input: 0.17 0.02 255;              /* input bg */
-    --ring: 0.62 0.22 258;              /* blue focus ring */
-    --chart-1: 0.62 0.22 258;           /* blue */
-    --chart-2: 0.63 0.18 145;           /* emerald green */
-    --chart-3: 0.72 0.18 60;            /* amber */
-    --chart-4: 0.62 0.18 300;           /* purple */
-    --chart-5: 0.72 0.14 25;            /* orange */
-    --radius: 0.625rem;
-    --sidebar: 0.12 0.025 255;
-    --sidebar-foreground: 0.92 0.01 250;
-    --sidebar-primary: 0.62 0.22 258;
-    --sidebar-primary-foreground: 0.98 0 0;
-    --sidebar-accent: 0.18 0.02 255;
-    --sidebar-accent-foreground: 0.92 0.01 250;
-    --sidebar-border: 0.24 0.035 255;
-    --sidebar-ring: 0.62 0.22 258;
+    /* ── Near-black terminal dark ── */
+    --background: 0.08 0.01 260;          /* #09090f near-black with cool tint */
+    --foreground: 0.96 0.008 240;          /* bright near-white, cool tint */
+    --card: 0.11 0.015 255;              /* #0d0d18 slightly lighter card */
+    --card-foreground: 0.96 0.008 240;
+    --popover: 0.13 0.015 255;
+    --popover-foreground: 0.96 0.008 240;
+    --primary: 0.68 0.18 210;            /* electric cyan-blue — terminal cyan */
+    --primary-foreground: 0.06 0.01 260; /* near black on primary */
+    --secondary: 0.14 0.015 255;
+    --secondary-foreground: 0.96 0.008 240;
+    --muted: 0.15 0.015 255;
+    --muted-foreground: 0.62 0.04 240;   /* brighter dim cool gray — readable */
+    --accent: 0.16 0.02 255;
+    --accent-foreground: 0.96 0.008 240;
+    --destructive: 0.58 0.22 20;
+    --border: 0.22 0.028 255;            /* slightly brighter dim border */
+    --input: 0.14 0.016 255;
+    --ring: 0.68 0.18 210;               /* cyan focus ring */
+    --chart-1: 0.68 0.18 210;            /* cyan */
+    --chart-2: 0.7 0.2 150;             /* neon green */
+    --chart-3: 0.75 0.18 70;            /* amber */
+    --chart-4: 0.65 0.22 290;           /* violet */
+    --chart-5: 0.7 0.18 25;             /* orange */
+    --radius: 0.5rem;
+    --sidebar: 0.1 0.015 255;
+    --sidebar-foreground: 0.93 0.01 240;
+    --sidebar-primary: 0.68 0.18 210;
+    --sidebar-primary-foreground: 0.06 0.01 260;
+    --sidebar-accent: 0.16 0.02 255;
+    --sidebar-accent-foreground: 0.93 0.01 240;
+    --sidebar-border: 0.19 0.025 255;
+    --sidebar-ring: 0.68 0.18 210;
   }
 
   * {
@@ -78,19 +86,20 @@ a,
 
   body {
     @apply bg-background text-foreground;
-    /* Subtle dot grid for terminal feel */
-    background-image: radial-gradient(circle, oklch(0.62 0.22 258 / 0.04) 1px, transparent 1px);
-    background-size: 28px 28px;
+    font-family: 'JetBrains Mono', monospace;
+    /* Ultra-subtle dot grid — terminal feel */
+    background-image:
+      radial-gradient(circle, oklch(0.68 0.18 210 / 0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 
   html {
-    @apply font-sans;
+    font-family: 'JetBrains Mono', monospace;
   }
 
-  /* Monospace numbers utility */
-  .num {
+  /* Tabular numbers everywhere */
+  .num, [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    font-family: 'Geist Variable', 'JetBrains Mono', monospace;
+    font-feature-settings: "tnum", "ss02";
   }
 }

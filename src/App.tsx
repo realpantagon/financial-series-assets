@@ -7,11 +7,16 @@ import Transactions from '@/pages/Transactions';
 import FXPage from '@/pages/FXPage';
 import FXAnalytics from '@/pages/FXAnalytics';
 import DimeStock from '@/pages/DimeStock';
+import SymbolDetailPage from '@/pages/SymbolDetailPage';
+import AddTradePage from '@/pages/AddTradePage';
 import { cn } from '@/lib/utils';
-import { Home, List, DollarSign, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, History, ArrowLeftRight, TrendingUp } from 'lucide-react';
+
+// ─── Nav item ─────────────────────────────────────────────────────────────────
 
 function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
     const location = useLocation();
+    // Stocks sub-pages should keep Stocks tab active
     const isActive = to === '/'
         ? location.pathname === '/'
         : location.pathname.startsWith(to);
@@ -20,81 +25,101 @@ function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: R
         <Link
             to={to}
             className={cn(
-                'flex flex-col items-center justify-center gap-1 w-full py-3 pb-2 transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                'relative flex flex-col items-center justify-center gap-1 w-full py-2 transition-all duration-150',
+                isActive ? 'text-cyan-400' : 'text-muted-foreground/50 hover:text-muted-foreground'
             )}
         >
+            {/* Active glow dot */}
+            {isActive && (
+                <span className="absolute top-0 inset-x-0 mx-auto w-8 h-px bg-gradient-to-r from-transparent via-cyan-400/80 to-transparent" />
+            )}
             <Icon
-                className={cn('size-5', isActive && 'stroke-[2.5]')}
-                strokeWidth={isActive ? 2.5 : 1.8}
+                className={cn('size-[18px]', isActive ? 'stroke-[2]' : 'stroke-[1.5]')}
             />
             <span className={cn(
-                'text-[10px] font-medium',
-                isActive ? 'font-semibold' : 'font-normal'
+                'text-[8px] uppercase tracking-[0.12em]',
+                isActive ? 'font-bold text-cyan-400' : 'font-medium'
             )}>
                 {label}
             </span>
-            {isActive && (
-                <span className="absolute bottom-0 block h-0.5 w-8 rounded-full bg-primary" />
-            )}
         </Link>
     );
 }
 
+// ─── Bottom nav ───────────────────────────────────────────────────────────────
+
 function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-            <div className="mx-auto max-w-lg bg-card border-t border-border shadow-lg">
-                <div className="grid grid-cols-4 h-[68px] items-center relative">
-                    <NavItem to="/" label="Dashboard" icon={Home} />
-                    <NavItem to="/transactions" label="History" icon={List} />
-                    <NavItem to="/fx" label="FX" icon={DollarSign} />
-                    <NavItem to="/dime-stock" label="Stocks" icon={TrendingUp} />
+            <div className="mx-auto max-w-lg border-t border-border/30 bg-[oklch(0.09_0.012_255/0.95)] backdrop-blur-md">
+                <div className="grid grid-cols-4 h-[54px] items-center">
+                    <NavItem to="/"             label="Home"    icon={LayoutDashboard} />
+                    <NavItem to="/transactions" label="History" icon={History} />
+                    <NavItem to="/fx"           label="FX"      icon={ArrowLeftRight} />
+                    <NavItem to="/dime-stock"   label="Stocks"  icon={TrendingUp} />
                 </div>
             </div>
         </div>
     );
 }
 
+// ─── Header ───────────────────────────────────────────────────────────────────
+
 function Header() {
     return (
-        <div className="bg-card border-b border-border sticky top-0 z-40">
-            <div className="max-w-lg mx-auto px-5 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2.5">
-                    <div className="size-7 rounded-md bg-primary flex items-center justify-center">
-                        <TrendingUp className="size-4 text-primary-foreground" strokeWidth={2.5} />
+        <div className="sticky top-0 z-40 border-b border-border/25 bg-[oklch(0.09_0.012_255/0.92)] backdrop-blur-md">
+            <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
+                {/* Logo */}
+                <div className="flex items-center gap-2">
+                    <div className="size-5 rounded bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                        <TrendingUp className="size-3 text-cyan-400" strokeWidth={2.5} />
                     </div>
-                    <span className="text-lg font-bold text-foreground tracking-tight">PanAssets</span>
+                    <span className="text-sm font-black text-foreground tracking-tight">
+                        Pan<span className="text-cyan-400">Assets</span>
+                    </span>
                 </div>
-                <Link
-                    to="/add"
-                    className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors"
-                >
-                    + Add
-                </Link>
+                {/* Terminal-style status */}
+                <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
+                </div>
             </div>
         </div>
     );
 }
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
     return (
         <BrowserRouter>
             <div className="min-h-screen flex flex-col bg-background">
                 <Header />
-                <div className="flex-1 w-full max-w-lg mx-auto p-3 pb-28">
+                <div className="flex-1 w-full max-w-lg mx-auto px-3 pb-28">
                     <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/add" element={<AddTransaction />} />
-                        <Route path="/transactions" element={<Transactions />} />
-                        <Route path="/fx" element={<FXPage />} />
-                        <Route path="/fx/analytics" element={<FXAnalytics />} />
-                        <Route path="/dime-stock" element={<DimeStock />} />
+                        <Route path="/"                     element={<Dashboard />} />
+                        <Route path="/add"                  element={<AddTransaction />} />
+                        <Route path="/transactions"         element={<Transactions />} />
+                        <Route path="/fx"                   element={<FXPage />} />
+                        <Route path="/fx/analytics"         element={<FXAnalytics />} />
+                        <Route path="/dime-stock"           element={<DimeStock />} />
+                        <Route path="/dime-stock-add"       element={<AddTradePage />} />
+                        <Route path="/dime-stock/:symbol"   element={<SymbolDetailPage />} />
                         <Route path="/account/:accountName" element={<AccountDetails />} />
                     </Routes>
                 </div>
                 <BottomNav />
-                <Toaster position="top-center" richColors />
+                <Toaster
+                    position="top-center"
+                    richColors
+                    toastOptions={{
+                        style: {
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '12px',
+                            letterSpacing: '0.02em',
+                        },
+                    }}
+                />
             </div>
         </BrowserRouter>
     );
