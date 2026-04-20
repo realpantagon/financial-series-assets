@@ -61,6 +61,7 @@ export default function FCDDashboard() {
 
   // UI State
   const [showAddEntry, setShowAddEntry] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Entry form
   const [entryData, setEntryData] = useState<NewFCDEntry>({
@@ -596,10 +597,15 @@ export default function FCDDashboard() {
             <h2 className="text-base font-bold text-foreground">Recent Transactions</h2>
             <span className="text-xs font-medium text-muted-foreground/60">{entries.length} records</span>
           </div>
-          <div className="space-y-3">
-            {[...entries]
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .map((entry) => {
+          <div className="space-y-0">
+            {(() => {
+              const sortedEntries = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              const totalPages = Math.ceil(sortedEntries.length / 10);
+              const paginatedEntries = sortedEntries.slice((currentPage - 1) * 10, currentPage * 10);
+
+              return (
+                <>
+                  {paginatedEntries.map((entry) => {
                 let icon;
                 let txLabel = entry.tx_type as string;
                 let amountColor = 'text-foreground';
@@ -680,15 +686,38 @@ export default function FCDDashboard() {
                 );
               })}
 
-            {entries.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground/60 bg-white/5 rounded-xl border border-dashed border-border/20">
-                <div className="text-4xl mb-3">📝</div>
-                <p>No transactions yet.</p>
-                <button onClick={() => setShowAddEntry(true)} className="text-cyan-400 font-medium text-sm mt-2 hover:underline">
-                  Add your first entry
-                </button>
-              </div>
-            )}
+              {entries.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground/60 bg-white/5 rounded-xl border border-dashed border-border/20">
+                  <div className="text-4xl mb-3">📝</div>
+                  <p>No transactions yet.</p>
+                  <button onClick={() => setShowAddEntry(true)} className="text-cyan-400 font-medium text-sm mt-2 hover:underline">
+                    Add your first entry
+                  </button>
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center p-3 border-t border-border/20 bg-black/10">
+                  <Button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="bg-black/20 hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
+                  >
+                    PREV
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground/60 font-mono tracking-[0.2em] font-bold">PAGE {currentPage}/{totalPages}</span>
+                  <Button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="bg-black/20 hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
+                  >
+                    NEXT
+                  </Button>
+                </div>
+              )}
+            </>
+          );
+        })()}
           </div>
         </div>
       </div>

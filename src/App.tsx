@@ -53,12 +53,12 @@ function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
             <div className="mx-auto max-w-lg border-t border-border/30 bg-[oklch(0.09_0.012_255/0.95)] backdrop-blur-md">
-                <div className="grid grid-cols-5 h-[54px] items-center">
-                    <NavItem to="/"             label="Home"    icon={LayoutDashboard} />
+                <div className="grid grid-cols-5 h-[72px] items-center pb-8">
+                    <NavItem to="/" label="Home" icon={LayoutDashboard} />
                     <NavItem to="/transactions" label="History" icon={History} />
-                    <NavItem to="/fx"           label="FX"      icon={ArrowLeftRight} />
-                    <NavItem to="/dime-stock"   label="Stocks"  icon={TrendingUp} />
-                    <NavItem to="/fcd"          label="FCD"     icon={Landmark} />
+                    <NavItem to="/fx" label="FX" icon={ArrowLeftRight} />
+                    <NavItem to="/dime-stock" label="Stocks" icon={TrendingUp} />
+                    <NavItem to="/fcd" label="FCD" icon={Landmark} />
                 </div>
             </div>
         </div>
@@ -99,16 +99,16 @@ function App() {
                 <Header />
                 <div className="flex-1 w-full max-w-lg mx-auto px-3 pb-28">
                     <Routes>
-                        <Route path="/"                     element={<Dashboard />} />
-                        <Route path="/add"                  element={<AddTransaction />} />
-                        <Route path="/transactions"         element={<Transactions />} />
-                        <Route path="/fx"                   element={<FXPage />} />
-                        <Route path="/fx/analytics"         element={<FXAnalytics />} />
-                        <Route path="/dime-stock"           element={<DimeStock />} />
-                        <Route path="/dime-stock-add"       element={<AddTradePage />} />
-                        <Route path="/dime-stock/:symbol"   element={<SymbolDetailPage />} />
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/add" element={<AddTransaction />} />
+                        <Route path="/transactions" element={<Transactions />} />
+                        <Route path="/fx" element={<FXPage />} />
+                        <Route path="/fx/analytics" element={<FXAnalytics />} />
+                        <Route path="/dime-stock" element={<DimeStock />} />
+                        <Route path="/dime-stock-add" element={<AddTradePage />} />
+                        <Route path="/dime-stock/:symbol" element={<SymbolDetailPage />} />
                         <Route path="/account/:accountName" element={<AccountDetails />} />
-                        <Route path="/fcd"                  element={<FCDDashboard />} />
+                        <Route path="/fcd" element={<FCDDashboard />} />
                     </Routes>
                 </div>
                 <BottomNav />
