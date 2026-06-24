@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import type { PantagonUSD } from '../types';
+import type { FinancialFX } from '../types';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, X, BarChart2, ArrowRight, Inbox, Loader2 } from 'lucide-react';
 
 const MONTHS = [
@@ -23,7 +23,7 @@ const MONTHS = [
 
 export default function FXPage() {
     const navigate = useNavigate();
-    const [data, setData] = useState<PantagonUSD[]>([]);
+    const [data, setData] = useState<FinancialFX[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -43,13 +43,11 @@ export default function FXPage() {
     const [selectedFromCurrency, setSelectedFromCurrency] = useState<string>('All');
     const [selectedToCurrency, setSelectedToCurrency] = useState<string>('All');
 
-    useEffect(() => { fetchData(); }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
-                .from('pantagon_usd')
+                .from('pantagon_financial_fx')
                 .select('*')
                 .order('transaction_at', { ascending: false });
 
@@ -61,12 +59,14 @@ export default function FXPage() {
                 setSelectedYear(latestDate.getFullYear());
                 setSelectedMonth(latestDate.getMonth());
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err) {
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -78,7 +78,7 @@ export default function FXPage() {
 
             if (!finalRate && foreign > 0 && thb > 0) finalRate = thb / foreign;
 
-            const { error } = await supabase.from('pantagon_usd').insert({
+            const { error } = await supabase.from('pantagon_financial_fx').insert({
                 transaction_at: new Date(form.transaction_at).toISOString(),
                 from_currency: form.from_currency,
                 to_currency: form.to_currency,
@@ -92,8 +92,8 @@ export default function FXPage() {
             setShowForm(false);
             setForm({ transaction_at: new Date().toISOString().slice(0, 16), from_currency: 'THB', to_currency: 'USD', thb_amount: '', foreign_amount: '', exchange_rate: '' });
             fetchData();
-        } catch (err: any) {
-            toast.error('Failed to save', { description: err.message });
+        } catch (err) {
+            toast.error('Failed to save', { description: getErrorMessage(err) });
         } finally {
             setFormLoading(false);
         }

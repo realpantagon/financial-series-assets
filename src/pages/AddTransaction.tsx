@@ -4,12 +4,13 @@ import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useAccounts } from '@/lib/accounts';
 import { ArrowDownLeft, ArrowUpRight, DollarSign, Tag, FileText, Loader2, ChevronLeft, ChevronDown } from 'lucide-react';
 
 export default function AddTransaction() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [accountName, setAccountName] = useState('');
+    const [accountName, setAccountName] = useState<string>(() => location.state?.accountName ?? '');
     const [type, setType] = useState<'IN' | 'OUT'>('IN');
     const [amount, setAmount] = useState<number | ''>('');
     const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -17,10 +18,6 @@ export default function AddTransaction() {
     const [note, setNote] = useState('');
     const [loading, setLoading] = useState(false);
     const [accountOpen, setAccountOpen] = useState(false);
-
-    useEffect(() => {
-        if (location.state?.accountName) setAccountName(location.state.accountName);
-    }, [location.state]);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -30,24 +27,15 @@ export default function AddTransaction() {
         return () => document.removeEventListener('click', handler);
     }, [accountOpen]);
 
-    const accountOptions = [
-        'SCB [Recieve/ Saving]',
-        'Dime [Invest]',
-        'Dime [Save]',
-        'Dime [FCD]',
-        'KBank Emergency',
-        'Make Monthly Expense',
-        'ttb Emergency Main',
-        'PVD [Kbank]',
-        'SSO'
-    ];
+    const { accounts: accountList } = useAccounts();
+    const accountOptions = accountList.map(a => a.name);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!accountName || !amount || !date) return;
 
         setLoading(true);
-        const { error } = await supabase.from('pantagon_assets').insert([{
+        const { error } = await supabase.from('pantagon_financial_transactions').insert([{
             account_name: accountName,
             type,
             amount: Number(amount),

@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import type { PantagonUSD } from '../types';
+import type { FinancialFX } from '../types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getErrorMessage } from '@/lib/utils';
 import {
     Select,
     SelectContent,
@@ -15,27 +16,27 @@ import { ArrowLeft, TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react
 
 export default function FXAnalytics() {
     const navigate = useNavigate();
-    const [data, setData] = useState<PantagonUSD[]>([]);
+    const [data, setData] = useState<FinancialFX[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const [selectedYear, setSelectedYear] = useState<string>('All');
     const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
 
-    useEffect(() => { fetchData(); }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase.from('pantagon_usd').select('*');
+            const { data, error } = await supabase.from('pantagon_financial_fx').select('*');
             if (error) throw error;
             setData(data || []);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err) {
+            setError(getErrorMessage(err));
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const availableYears = useMemo(() => {
         const years = new Set(data.map(item => new Date(item.transaction_at).getFullYear()));

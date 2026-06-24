@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { ChevronLeft, TrendingUp, TrendingDown, Activity, Trash2 } from 'lucide-react';
 import {
     AlertDialog,
@@ -75,20 +75,21 @@ export default function SymbolDetailPage() {
     const [loading, setLoading] = useState(true);
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
+    const fetchTransactions = useCallback(async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('pantagon_financial_stock_trades')
+            .select('*')
+            .order('transaction_date', { ascending: false });
+        if (error) toast.error('Failed to load trades', { description: error.message });
+        else setTransactions((data as DimeTransaction[]) || []);
+        setLoading(false);
+    }, []);
+
     useEffect(() => {
         if (!symbol) return;
         fetchTransactions();
-    }, [symbol]);
-
-    const fetchTransactions = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('dime_transactions')
-            .select('*')
-            .order('transaction_date', { ascending: false });
-        if (!error) setTransactions((data as DimeTransaction[]) || []);
-        setLoading(false);
-    };
+    }, [symbol, fetchTransactions]);
 
     const symTxs = useMemo(() =>
         [...transactions]
@@ -124,12 +125,12 @@ export default function SymbolDetailPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            const { error } = await supabase.from('dime_transactions').delete().eq('id', id);
+            const { error } = await supabase.from('pantagon_financial_stock_trades').delete().eq('id', id);
             if (error) throw error;
             toast.success('Transaction deleted');
             setDeleteId(null);
             await fetchTransactions();
-        } catch (err: any) { toast.error('Delete failed', { description: err.message }); }
+        } catch (err) { toast.error('Delete failed', { description: getErrorMessage(err) }); }
     };
 
     if (loading) return (

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { fetchFCDEntries, addFCDEntry, calculateFCDStats, formatCurrency } from "../api/fcd"
 import type { FCDEntry, FCDStats, NewFCDEntry, FCDTxType } from "../api/fcd/types"
 import { format, parseISO, parse } from "date-fns"
@@ -74,11 +74,7 @@ export default function FCDDashboard() {
     note: "",
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const data = await fetchFCDEntries()
       setEntries(data)
@@ -89,7 +85,11 @@ export default function FCDDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
 
   const rateChartData = entries
@@ -458,7 +458,7 @@ export default function FCDDashboard() {
                     contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "12px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                     itemStyle={{ color: "#f8fafc" }}
                     labelStyle={{ color: "#52525b", marginBottom: "0.25rem", fontSize: "0.75rem" }}
-                    formatter={(value: any) => [value ? Number(value).toFixed(4) : "0.0000", 'Rate']}
+                    formatter={(value) => [value ? Number(value).toFixed(4) : "0.0000", 'Rate']}
                   />
                   <Line
                     type="monotone"

@@ -1,60 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import type { PantagonAsset } from '../types';
+import type { FinancialTransaction } from '../types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getAccountIcon } from '@/lib/accounts';
 import { ArrowLeft, Plus, ArrowDownLeft, ArrowUpRight, TrendingDown, TrendingUp } from 'lucide-react';
 
 export default function AccountDetails() {
     const { accountName } = useParams<{ accountName: string }>();
     const navigate = useNavigate();
-    const [assets, setAssets] = useState<PantagonAsset[]>([]);
+    const [assets, setAssets] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [summary, setSummary] = useState({ total: 0, in: 0, out: 0 });
 
-    const getAccountIcon = (name: string): string | undefined => {
-        const lower = name.toLowerCase();
-        if (lower.includes('scb')) return '/scb.jpg';
-        if (lower.includes('dime')) return '/Dime.png';
-        if (lower.includes('kbank') || lower.includes('make')) return '/kbank.png';
-        if (lower.includes('ttb')) return '/ttb.png';
-        if (lower.includes('sso')) return '/SSO.jpg';
-        return undefined;
-    };
-
-    useEffect(() => {
-        if (accountName) fetchAccountAssets(accountName);
-    }, [accountName]);
-
-    const fetchAccountAssets = async (name: string) => {
+    const fetchAccountAssets = useCallback(async (name: string) => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('pantagon_assets')
+            .from('pantagon_financial_transactions')
             .select('*')
             .eq('account_name', name)
             .order('date', { ascending: false })
             .order('id', { ascending: false });
 
-        if (!error) {
-            const fetchedAssets = data || [];
-            setAssets(fetchedAssets);
-            calculateSummary(fetchedAssets);
-        }
+        if (error) toast.error('Failed to load transactions', { description: error.message });
+        else setAssets(data || []);
         setLoading(false);
-    };
+    }, []);
 
-    const calculateSummary = (data: PantagonAsset[]) => {
+    useEffect(() => {
+        if (accountName) fetchAccountAssets(accountName);
+    }, [accountName, fetchAccountAssets]);
+
+    const summary = useMemo(() => {
         let total = 0, totalIn = 0, totalOut = 0;
-        data.forEach(item => {
+        assets.forEach(item => {
             const amount = Number(item.amount);
             if (item.type === 'IN') { total += amount; totalIn += amount; }
             else { total -= amount; totalOut += amount; }
         });
-        setSummary({ total, in: totalIn, out: totalOut });
-    };
+        return { total, in: totalIn, out: totalOut };
+    }, [assets]);
 
     const formatCurrency = (value: number) =>
         value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });

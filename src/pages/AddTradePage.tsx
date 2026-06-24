@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Code2, ChevronLeft, ChevronRight, Copy, Check, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ export default function AddTradePage() {
     const [jsonInput, setJsonInput] = useState('');
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [jsonSuccess, setJsonSuccess] = useState(false);
-    const [batchPreview, setBatchPreview] = useState<any[] | null>(null);
+    const [batchPreview, setBatchPreview] = useState<Record<string, unknown>[] | null>(null);
     const [batchSaving, setBatchSaving] = useState(false);
     const [batchError, setBatchError] = useState<string | null>(null);
     const [copiedPrompt, setCopiedPrompt] = useState(false);
@@ -112,7 +112,7 @@ export default function AddTradePage() {
             el.style.cssText = 'position:fixed;opacity:0';
             document.body.appendChild(el);
             el.focus(); el.select();
-            try { document.execCommand('copy'); setCopiedPrompt(true); setTimeout(() => setCopiedPrompt(false), 2000); } catch {}
+            try { document.execCommand('copy'); setCopiedPrompt(true); setTimeout(() => setCopiedPrompt(false), 2000); } catch { /* clipboard not available */ }
             document.body.removeChild(el);
         };
         if (navigator.clipboard && window.isSecureContext)
@@ -130,7 +130,7 @@ export default function AddTradePage() {
             if (arrMatch) {
                 const arr = JSON.parse(arrMatch[0]);
                 if (!Array.isArray(arr) || arr.length === 0) throw new Error('Empty array');
-                arr.forEach((item: any, i: number) => {
+                arr.forEach((item: Record<string, unknown>, i: number) => {
                     if (!item.side || !item.symbol || !item.executed_price || !item.transaction_date)
                         throw new Error(`Item ${i + 1} missing required fields`);
                     if (item.side === 'BUY' && item.input_amount_usd == null) throw new Error(`Item ${i + 1}: BUY requires input_amount_usd`);
@@ -151,7 +151,7 @@ export default function AddTradePage() {
                 if (parsed.executed_price != null) nf.executed_price = String(Math.abs(Number(parsed.executed_price)));
                 if (parsed.input_amount_usd != null) nf.input_amount_usd = String(parsed.input_amount_usd);
                 if (parsed.input_shares != null) nf.input_shares = String(parsed.input_shares);
-                const gf = (v: any) => (v == null || Number(v) === 0) ? '' : String(Math.abs(Number(v)));
+                const gf = (v: unknown) => (v == null || Number(v) === 0) ? '' : String(Math.abs(Number(v)));
                 nf.commission = gf(parsed.commission); nf.vat = gf(parsed.vat);
                 nf.fee = gf(parsed.fee); nf.sec_fee = gf(parsed.sec_fee); nf.taf_fee = gf(parsed.taf_fee);
                 setForm(nf); setJsonSuccess(true); setJsonInput('');
@@ -159,10 +159,10 @@ export default function AddTradePage() {
                 return;
             }
             throw new Error('No JSON found');
-        } catch (e: any) { setJsonError(e.message || 'Could not parse JSON'); }
+        } catch (e) { setJsonError(getErrorMessage(e) || 'Could not parse JSON'); }
     };
 
-    const buildPayload = (p: any) => {
+    const buildPayload = (p: Record<string, unknown>) => {
         const execPrice = Number(p.executed_price);
         const commission = p.commission != null ? Math.abs(Number(p.commission)) : null;
         const vat = p.vat != null ? Math.abs(Number(p.vat)) : null;
@@ -182,18 +182,18 @@ export default function AddTradePage() {
             stock_amount = input_shares * execPrice;
             total_amount = stock_amount - totalFees;
         }
-        return { side: p.side, transaction_date: new Date(p.transaction_date).toISOString(), symbol: String(p.symbol).toUpperCase().trim(), shares, total_amount, executed_price: execPrice, commission, vat, fee: fee === 0 ? null : fee, sec_fee: sec_fee === 0 ? null : sec_fee, taf_fee: taf_fee === 0 ? null : taf_fee, input_amount_usd: p.side === 'BUY' ? input_amount_usd : null, input_shares: p.side === 'SELL' ? input_shares : null, stock_amount, currency: 'USD' };
+        return { side: p.side, transaction_date: new Date(p.transaction_date as string).toISOString(), symbol: String(p.symbol).toUpperCase().trim(), shares, total_amount, executed_price: execPrice, commission, vat, fee: fee === 0 ? null : fee, sec_fee: sec_fee === 0 ? null : sec_fee, taf_fee: taf_fee === 0 ? null : taf_fee, input_amount_usd: p.side === 'BUY' ? input_amount_usd : null, input_shares: p.side === 'SELL' ? input_shares : null, stock_amount, currency: 'USD' };
     };
 
     const handleBatchSave = async () => {
         if (!batchPreview) return;
         setBatchError(null); setBatchSaving(true);
         try {
-            const { error } = await supabase.from('dime_transactions').insert(batchPreview.map(buildPayload));
+            const { error } = await supabase.from('pantagon_financial_stock_trades').insert(batchPreview.map(buildPayload));
             if (error) throw error;
             toast.success(`${batchPreview.length} transactions imported`);
             navigate(-1);
-        } catch (err: any) { setBatchError(err.message); }
+        } catch (err) { setBatchError(getErrorMessage(err)); }
         finally { setBatchSaving(false); }
     };
 
@@ -223,7 +223,7 @@ export default function AddTradePage() {
 
         try {
             setSaving(true);
-            const { error } = await supabase.from('dime_transactions').insert([{
+            const { error } = await supabase.from('pantagon_financial_stock_trades').insert([{
                 side: form.side, transaction_date: new Date(form.transaction_date).toISOString(),
                 symbol: form.symbol.toUpperCase().trim(), shares, total_amount, executed_price: execPrice,
                 ...fees, input_amount_usd: form.side === 'BUY' ? input_amount_usd : null,
@@ -232,7 +232,7 @@ export default function AddTradePage() {
             if (error) throw error;
             toast.success(`${form.side} recorded — ${form.symbol.toUpperCase()}`);
             navigate(-1);
-        } catch (err: any) { setSaveError(err.message); }
+        } catch (err) { setSaveError(getErrorMessage(err)); }
         finally { setSaving(false); }
     };
 
@@ -314,7 +314,7 @@ export default function AddTradePage() {
                                             {batchPreview.map((item, i) => (
                                                 <div key={i} className="flex items-center justify-between bg-black/40 border border-border/20 px-2 py-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <SidePill side={item.side} />
+                                                        <SidePill side={String(item.side)} />
                                                         <span className="text-sm font-mono font-black">{String(item.symbol).toUpperCase()}</span>
                                                         <span className="text-[10px] text-muted-foreground">{item.side === 'BUY' ? `$${Number(item.input_amount_usd).toFixed(2)}` : `${Number(item.input_shares)} sh`}</span>
                                                     </div>
@@ -419,7 +419,7 @@ export default function AddTradePage() {
                                     <label className="text-[9px] text-muted-foreground/70 uppercase tracking-widest">{label}</label>
                                     <Input
                                         type="number"
-                                        value={(form as any)[key]}
+                                        value={form[key]}
                                         onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
                                         placeholder="0.00"
                                         step="0.000001"

@@ -1,74 +1,65 @@
-# React + TypeScript + Vite
+# PanAssets — Financial Series Assets
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal finance PWA (React + TypeScript + Vite) backed by Supabase. Tracks bank/investment account balances, FX conversions, Dime stock trades, FCD (foreign-currency / gold), and monthly salary allocation.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** + **Vite 7** + **TypeScript**
+- **Supabase** (`@supabase/supabase-js`) — Postgres backend
+- **Tailwind CSS 3** + **shadcn/radix-ui** components
+- **recharts** / **chart.js** for charts, **tesseract.js** for receipt OCR
+- **vite-plugin-pwa** for installable PWA (iOS/Android)
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+cp .env.example .env   # then fill in your Supabase credentials
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Create `.env` (not committed) with:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
-# financial-series-assets
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start dev server (default port 5173) |
+| `npm run build` | Type-check + production build |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+
+## Supabase tables
+
+All app tables use the `pantagon_financial_*` prefix:
+
+| Table | Purpose |
+|---|---|
+| `pantagon_financial_transactions` | Bank/account IN/OUT ledger |
+| `pantagon_financial_fx` | Currency conversion records |
+| `pantagon_financial_stock_trades` | Dime broker stock trades |
+| `pantagon_financial_fcd` | Foreign-currency deposit / gold |
+| `pantagon_financial_salary_logs` | Monthly salary allocation history |
+| `pantagon_financial_accounts` | Account catalog (names, icons, ordering) for UI dropdowns |
+
+> **Note:** Row Level Security is currently disabled on these tables. The app uses the public anon key client-side with no auth layer — anyone with the key can read/write. Add Supabase Auth + RLS policies before exposing this publicly.
+
+## Project structure
+
+```
+src/
+  pages/        Route pages (Dashboard, Transactions, FX, DimeStock, FCD, SalaryAllocation, …)
+  components/
+    ui/         shadcn/radix primitives
+    fcd/        FCD-specific inputs/buttons
+  api/fcd/      FCD data access + calculations
+  lib/          Shared utils, account catalog hook
+  supabaseClient.ts
+```

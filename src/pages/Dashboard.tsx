@@ -1,63 +1,59 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../supabaseClient';
-import type { PantagonAsset } from '../types';
+import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChevronRight, Wallet } from 'lucide-react';
+import { useAccounts, getAccountIcon } from '@/lib/accounts';
+import { ChevronRight, Wallet, Banknote } from 'lucide-react';
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const [assets, setAssets] = useState<PantagonAsset[]>([]);
+    const { accounts: catalog } = useAccounts();
+    const [assets, setAssets] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [totalAssetValue, setTotalAssetValue] = useState(0);
-    const [accounts, setAccounts] = useState<{ name: string; balance: number }[]>([]);
 
-    useEffect(() => { fetchAssets(); }, []);
-
-    const fetchAssets = async () => {
+    const fetchAssets = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('pantagon_assets').select('*').order('date', { ascending: false });
-        if (!error) { const a = data || []; setAssets(a); calculateAssetView(a); }
+        const { data, error } = await supabase
+            .from('pantagon_financial_transactions')
+            .select('*')
+            .order('date', { ascending: false });
+        if (error) toast.error('Failed to load transactions', { description: error.message });
+        else setAssets(data || []);
         setLoading(false);
-    };
+    }, []);
 
-    const calculateAssetView = (data: PantagonAsset[]) => {
-        let total = 0;
-        const accountMap: { [key: string]: number } = {};
-        data.forEach(item => {
-            const amount = Number(item.amount);
-            const signed = item.type === 'IN' ? amount : -amount;
-            total += signed;
+    useEffect(() => { fetchAssets(); }, [fetchAssets]);
+
+    const totalAssetValue = useMemo(
+        () => assets.reduce((sum, item) => sum + (item.type === 'IN' ? Number(item.amount) : -Number(item.amount)), 0),
+        [assets]
+    );
+
+    const accounts = useMemo(() => {
+        const accountMap: Record<string, number> = {};
+        assets.forEach(item => {
+            const signed = item.type === 'IN' ? Number(item.amount) : -Number(item.amount);
             const acc = item.account_name || 'Unassigned';
             accountMap[acc] = (accountMap[acc] || 0) + signed;
         });
-        setTotalAssetValue(total);
-        const getRank = (name: string) => {
-            const l = name.toLowerCase();
-            if (l.includes('dime')) return 1; if (l.includes('scb')) return 2;
-            if (l.includes('kbank')) return 3; if (l.includes('ttb')) return 4;
-            if (l.includes('pvd')) return 5; if (l.includes('sso')) return 6;
-            return 7;
+        // Order by the account catalog's display_order; unknown accounts sink to the bottom.
+        const orderOf = (name: string) => {
+            const hit = catalog.find(c => c.name === name);
+            return hit ? hit.display_order : 9999;
         };
-        setAccounts(
-            Object.keys(accountMap).map(name => ({ name, balance: accountMap[name] }))
-                .sort((a, b) => { const r = getRank(a.name) - getRank(b.name); return r !== 0 ? r : b.balance - a.balance; })
-        );
-    };
+        return Object.keys(accountMap)
+            .map(name => ({ name, balance: accountMap[name] }))
+            .sort((a, b) => {
+                const r = orderOf(a.name) - orderOf(b.name);
+                return r !== 0 ? r : b.balance - a.balance;
+            });
+    }, [assets, catalog]);
 
     const formatCurrency = (value: number) =>
         value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });
-
-    const getAccountIcon = (accountName: string): string | undefined => {
-        const lower = accountName.toLowerCase();
-        if (lower.includes('scb')) return '/scb.jpg';
-        if (lower.includes('dime')) return '/Dime.png';
-        if (lower.includes('kbank') || lower.includes('make')) return '/kbank.png';
-        if (lower.includes('ttb')) return '/ttb.png';
-        if (lower.includes('sso')) return '/SSO.jpg';
-        return undefined;
-    };
 
     if (loading) {
         return (
@@ -87,6 +83,18 @@ export default function Dashboard() {
                     <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">{assets.length} transactions</span>
                 </div>
             </div>
+
+            {/* Salary allocation quick action */}
+            <button
+                onClick={() => navigate('/salary')}
+                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-[oklch(0.12_0.015_255)] hover:border-cyan-500/35 hover:bg-[oklch(0.13_0.015_255)] transition-all duration-150 active:scale-[0.99] rounded-xl"
+            >
+                <div className="size-9 rounded-full bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
+                    <Banknote className="size-4 text-cyan-400" />
+                </div>
+                <span className="font-bold text-sm text-foreground flex-1 text-left">Salary Allocation</span>
+                <ChevronRight className="size-3.5 text-muted-foreground/20" />
+            </button>
 
             {/* Accounts label */}
             <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em] px-1 mt-1">

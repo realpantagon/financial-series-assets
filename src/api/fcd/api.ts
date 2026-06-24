@@ -3,7 +3,7 @@ import type { FCDEntry, NewFCDEntry } from './types';
 
 export async function fetchFCDEntries(): Promise<FCDEntry[]> {
   const { data, error } = await supabase
-    .from('Pantagon_fcd')
+    .from('pantagon_financial_fcd')
     .select('*')
     .order('date', { ascending: false });
   
@@ -13,7 +13,7 @@ export async function fetchFCDEntries(): Promise<FCDEntry[]> {
 
 export async function addFCDEntry(entry: NewFCDEntry): Promise<FCDEntry> {
   const { data, error } = await supabase
-    .from('Pantagon_fcd')
+    .from('pantagon_financial_fcd')
     .insert([entry])
     .select()
     .single();
@@ -24,7 +24,7 @@ export async function addFCDEntry(entry: NewFCDEntry): Promise<FCDEntry> {
 
 export async function updateFCDEntry(id: number, entry: Partial<NewFCDEntry>): Promise<FCDEntry> {
   const { data, error } = await supabase
-    .from('Pantagon_fcd')
+    .from('pantagon_financial_fcd')
     .update(entry)
     .eq('id', id)
     .select()
@@ -36,7 +36,7 @@ export async function updateFCDEntry(id: number, entry: Partial<NewFCDEntry>): P
 
 export async function deleteFCDEntry(id: number): Promise<void> {
   const { error } = await supabase
-    .from('Pantagon_fcd')
+    .from('pantagon_financial_fcd')
     .delete()
     .eq('id', id);
   

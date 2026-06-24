@@ -1,48 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import type { PantagonAsset } from '../types';
+import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getAccountIcon } from '@/lib/accounts';
 import { ArrowDownLeft, ArrowUpRight, Wallet, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 20;
 
 export default function Transactions() {
-    const [assets, setAssets] = useState<PantagonAsset[]>([]);
+    const [assets, setAssets] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
 
-    useEffect(() => { fetchAllAssets(); }, []);
-
-    const fetchAllAssets = async () => {
+    const fetchAllAssets = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('pantagon_assets')
+            .from('pantagon_financial_transactions')
             .select('*')
             .order('date', { ascending: false })
             .order('id', { ascending: false });
-        if (!error) setAssets(data || []);
+        if (error) toast.error('Failed to load transactions', { description: error.message });
+        else setAssets(data || []);
         setLoading(false);
-    };
+    }, []);
+
+    useEffect(() => { fetchAllAssets(); }, [fetchAllAssets]);
 
     const formatCurrency = (value: number) =>
-        value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
         return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
-    };
-
-    const getAccountIcon = (accountName: string): string | undefined => {
-        if (!accountName) return undefined;
-        const lower = accountName.toLowerCase();
-        if (lower.includes('scb')) return '/scb.jpg';
-        if (lower.includes('dime')) return '/Dime.png';
-        if (lower.includes('kbank') || lower.includes('make')) return '/kbank.png';
-        if (lower.includes('ttb')) return '/ttb.png';
-        if (lower.includes('sso')) return '/SSO.jpg';
-        return undefined;
     };
 
     const totalPages = Math.max(1, Math.ceil(assets.length / PAGE_SIZE));

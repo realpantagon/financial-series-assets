@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
@@ -14,7 +14,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
+import { toast } from 'sonner';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
     Trash2, Inbox, Activity, Check, Filter
@@ -208,17 +209,17 @@ export default function DimeStock() {
         return () => document.removeEventListener('click', handler);
     }, [filterOpen]);
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase.from('dime_transactions').select('*').order('transaction_date', { ascending: false });
+            const { data, error } = await supabase.from('pantagon_financial_stock_trades').select('*').order('transaction_date', { ascending: false });
             if (error) throw error;
             setTransactions((data as DimeTransaction[]) || []);
-        } catch (err: any) { setError(err.message); }
+        } catch (err) { setError(getErrorMessage(err)); }
         finally { setLoading(false); }
-    };
+    }, []);
 
-    useEffect(() => { fetchTransactions(); }, []);
+    useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
     const symbolSummaries: SymbolSummary[] = useMemo(() => {
         const map: Record<string, SymbolSummary> = {};
@@ -271,11 +272,11 @@ export default function DimeStock() {
 
     const handleDelete = async (id: string) => {
         try {
-            const { error } = await supabase.from('dime_transactions').delete().eq('id', id);
+            const { error } = await supabase.from('pantagon_financial_stock_trades').delete().eq('id', id);
             if (error) throw error;
             setDeleteId(null);
             await fetchTransactions();
-        } catch (err: any) { }
+        } catch (err) { toast.error('Delete failed', { description: getErrorMessage(err) }); }
     };
 
     if (loading) return (

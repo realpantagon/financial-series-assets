@@ -19,5 +19,19 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Over-aggressive in React 19: flags the standard setLoading(true)
+      // pattern inside async fetch fns wrapped in useCallback that are
+      // intentionally called from useEffect.
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
+    // shadcn primitives intentionally export both components and `*Variants`.
+    // The Fast Refresh warning here is by design of the pattern.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

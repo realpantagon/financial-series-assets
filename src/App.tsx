@@ -1,17 +1,35 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import Dashboard from '@/pages/Dashboard';
-import AddTransaction from '@/pages/AddTransaction';
-import AccountDetails from '@/pages/AccountDetails';
-import Transactions from '@/pages/Transactions';
-import FXPage from '@/pages/FXPage';
-import FXAnalytics from '@/pages/FXAnalytics';
-import DimeStock from '@/pages/DimeStock';
-import SymbolDetailPage from '@/pages/SymbolDetailPage';
-import AddTradePage from '@/pages/AddTradePage';
-import FCDDashboard from '@/pages/FCDDashboard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, History, ArrowLeftRight, TrendingUp, Landmark } from 'lucide-react';
+
+// Lazy-load all routes — keeps initial bundle small (especially the FCD page
+// which pulls in tesseract.js + recharts).
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const AddTransaction = lazy(() => import('@/pages/AddTransaction'));
+const AccountDetails = lazy(() => import('@/pages/AccountDetails'));
+const Transactions = lazy(() => import('@/pages/Transactions'));
+const FXPage = lazy(() => import('@/pages/FXPage'));
+const FXAnalytics = lazy(() => import('@/pages/FXAnalytics'));
+const DimeStock = lazy(() => import('@/pages/DimeStock'));
+const SymbolDetailPage = lazy(() => import('@/pages/SymbolDetailPage'));
+const AddTradePage = lazy(() => import('@/pages/AddTradePage'));
+const FCDDashboard = lazy(() => import('@/pages/FCDDashboard'));
+const SalaryAllocation = lazy(() => import('@/pages/SalaryAllocation'));
+
+function RouteFallback() {
+    return (
+        <div className="flex flex-col gap-3 pt-4 pb-20">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <div className="flex flex-col gap-2">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+            </div>
+        </div>
+    );
+}
 
 // ─── Nav item ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +98,7 @@ function Header() {
                         Pan<span className="text-cyan-400">Assets</span>
                     </span>
                 </div>
-                {/* Terminal-style status */}
+                {/* Status */}
                 <div className="flex items-center gap-1.5">
                     <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
@@ -94,37 +112,42 @@ function Header() {
 
 function App() {
     return (
-        <BrowserRouter>
-            <div className="min-h-screen flex flex-col bg-background">
-                <Header />
-                <div className="flex-1 w-full max-w-lg mx-auto px-3 pb-28">
-                    <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/add" element={<AddTransaction />} />
-                        <Route path="/transactions" element={<Transactions />} />
-                        <Route path="/fx" element={<FXPage />} />
-                        <Route path="/fx/analytics" element={<FXAnalytics />} />
-                        <Route path="/dime-stock" element={<DimeStock />} />
-                        <Route path="/dime-stock-add" element={<AddTradePage />} />
-                        <Route path="/dime-stock/:symbol" element={<SymbolDetailPage />} />
-                        <Route path="/account/:accountName" element={<AccountDetails />} />
-                        <Route path="/fcd" element={<FCDDashboard />} />
-                    </Routes>
+        <ErrorBoundary>
+            <BrowserRouter>
+                <div className="min-h-screen flex flex-col bg-background">
+                    <Header />
+                    <div className="flex-1 w-full max-w-lg mx-auto px-3 pb-28">
+                        <Suspense fallback={<RouteFallback />}>
+                            <Routes>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route path="/add" element={<AddTransaction />} />
+                                <Route path="/transactions" element={<Transactions />} />
+                                <Route path="/fx" element={<FXPage />} />
+                                <Route path="/fx/analytics" element={<FXAnalytics />} />
+                                <Route path="/dime-stock" element={<DimeStock />} />
+                                <Route path="/dime-stock-add" element={<AddTradePage />} />
+                                <Route path="/dime-stock/:symbol" element={<SymbolDetailPage />} />
+                                <Route path="/account/:accountName" element={<AccountDetails />} />
+                                <Route path="/fcd" element={<FCDDashboard />} />
+                                <Route path="/salary" element={<SalaryAllocation />} />
+                            </Routes>
+                        </Suspense>
+                    </div>
+                    <BottomNav />
+                    <Toaster
+                        position="top-center"
+                        richColors
+                        toastOptions={{
+                            style: {
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: '12px',
+                                letterSpacing: '0.02em',
+                            },
+                        }}
+                    />
                 </div>
-                <BottomNav />
-                <Toaster
-                    position="top-center"
-                    richColors
-                    toastOptions={{
-                        style: {
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '12px',
-                            letterSpacing: '0.02em',
-                        },
-                    }}
-                />
-            </div>
-        </BrowserRouter>
+            </BrowserRouter>
+        </ErrorBoundary>
     );
 }
 
