@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Inbox, Activity, Check, Filter, BarChart2, CalendarDays, RefreshCw
+    Inbox, Activity, Check, Filter, BarChart2, CalendarDays, RefreshCw, Zap
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
 import { useDailyPrices } from '@/hooks/useDailyPrices';
@@ -564,6 +564,13 @@ export default function DimeStock() {
                             <RefreshCw className={cn('size-3.5', priceLoading && 'animate-spin')} />
                         </button>
                     )}
+                    <button
+                        onClick={() => navigate('/dime-stock/prices')}
+                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
+                    >
+                        <Zap className="size-3.5" />
+                        LIVE
+                    </button>
                     <button
                         onClick={() => navigate('/dime-stock/yearly')}
                         className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
