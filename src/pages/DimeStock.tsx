@@ -7,9 +7,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Inbox, Activity, Check, Filter, BarChart2, CalendarDays
+    Inbox, Activity, Check, Filter, BarChart2, CalendarDays, RefreshCw
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
+import { useDailyPrices } from '@/hooks/useDailyPrices';
+import type { PriceQuote } from '@/lib/dailyPrices';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,11 +106,14 @@ function TradeRow({ tx }: { tx: DimeTransaction }) {
 
 // ─── Position Card ────────────────────────────────────────────────────────────
 
-function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void }) {
+function PositionCard({ s, onClick, price }: { s: SymbolSummary; onClick: () => void; price?: PriceQuote }) {
     const hasSold = s.totalSellAmount > 0;
     const plPositive = s.realizedPL >= 0;
     const hasPosition = s.totalShares > 0;
     const isClosed = !hasPosition && hasSold;
+
+    const unrealPL  = price && hasPosition ? (price.c - s.avgBuyPrice) * s.totalShares : null;
+    const unrealPct = price && s.avgBuyPrice > 0 ? ((price.c - s.avgBuyPrice) / s.avgBuyPrice) * 100 : null;
 
     return (
         <button
@@ -154,6 +159,41 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                         <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
                     </div>
                 </div>
+
+                {/* Live price + unrealized P&L */}
+                {price && (
+                    <div className="mb-3 border border-border/20 bg-black/20 rounded-lg px-3 py-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em]">Price</span>
+                                <span className={cn(
+                                    'text-[8px] font-mono font-bold px-1 py-px rounded',
+                                    price.dp >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                                )}>
+                                    {price.dp >= 0 ? '+' : ''}{price.dp.toFixed(2)}%
+                                </span>
+                            </div>
+                            <span className="font-mono font-bold text-sm text-foreground/90">${price.c.toFixed(2)}</span>
+                        </div>
+                        {unrealPL !== null && unrealPct !== null && (
+                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/10">
+                                <span className="text-[8px] text-muted-foreground/30 uppercase tracking-wider">Unrealized</span>
+                                <div className="text-right">
+                                    <span className={cn('font-mono font-bold text-xs',
+                                        unrealPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                    )}>
+                                        {unrealPL >= 0 ? '+' : ''}{fmt(unrealPL)}
+                                    </span>
+                                    <span className={cn('text-[9px] font-mono ml-1',
+                                        unrealPL >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'
+                                    )}>
+                                        ({unrealPct >= 0 ? '+' : ''}{unrealPct.toFixed(2)}%)
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Position size */}
                 {hasPosition && (
@@ -444,6 +484,13 @@ export default function DimeStock() {
         });
     }, [transactions]);
 
+    // ── Daily price feed ──────────────────────────────────────────────────────
+    const openSymbols = useMemo(() =>
+        symbolSummaries.filter(s => s.totalShares > 0).map(s => s.symbol)
+    , [symbolSummaries]);
+
+    const { prices, loading: priceLoading, progress: priceProgress, refresh: refreshPrices, isConfigured: priceConfigured } = useDailyPrices(openSymbols);
+
     const filteredSummaries = useMemo(() => {
         const base = symbolFilter ? symbolSummaries.filter(s => s.symbol === symbolFilter) : symbolSummaries;
         return [...base].sort((a, b) => {
@@ -507,6 +554,16 @@ export default function DimeStock() {
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {priceConfigured && (
+                        <button
+                            onClick={refreshPrices}
+                            disabled={priceLoading}
+                            title={priceLoading ? `Fetching prices… ${priceProgress}%` : 'Refresh prices'}
+                            className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 w-9 h-9 rounded-none transition-all disabled:opacity-40"
+                        >
+                            <RefreshCw className={cn('size-3.5', priceLoading && 'animate-spin')} />
+                        </button>
+                    )}
                     <button
                         onClick={() => navigate('/dime-stock/yearly')}
                         className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
@@ -556,6 +613,29 @@ export default function DimeStock() {
                     </p>
                 </div>
             </div>
+
+            {/* ── Price fetch status ── */}
+            {priceConfigured && priceLoading && (
+                <div className="flex items-center gap-2 px-1">
+                    <div className="flex-1 h-0.5 bg-border/10 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-cyan-500/50 transition-all duration-300"
+                            style={{ width: `${priceProgress}%` }}
+                        />
+                    </div>
+                    <span className="text-[8px] font-mono text-muted-foreground/35 tracking-wider whitespace-nowrap">
+                        PRICES {priceProgress}%
+                    </span>
+                </div>
+            )}
+            {priceConfigured && !priceLoading && Object.keys(prices).length > 0 && (
+                <div className="flex items-center gap-1 px-1">
+                    <span className="size-1.5 rounded-full bg-emerald-400/60 shrink-0" />
+                    <span className="text-[8px] font-mono text-muted-foreground/30 tracking-wider">
+                        {Object.keys(prices).length} prices · today
+                    </span>
+                </div>
+            )}
 
             {/* ── Portfolio Map toggle ── */}
             <button
@@ -675,6 +755,7 @@ export default function DimeStock() {
                                         key={s.symbol}
                                         s={s}
                                         onClick={() => navigate(`/dime-stock/${s.symbol}`)}
+                                        price={prices[s.symbol]}
                                     />
                                 ))}
                             </div>
