@@ -80,12 +80,54 @@ function SidePill({ side }: { side: string }) {
         <span className={cn(
             'inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border tracking-wider',
             side === 'BUY'  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25' :
-            side === 'SELL' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' :
-                              'bg-violet-500/10 text-violet-400 border-violet-500/25'
+                              'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
         )}>
             {side}
         </span>
     );
+}
+
+// ─── Payload builder → dime_trades schema ────────────────────────────────────
+
+function buildDimePayload(p: Record<string, unknown>) {
+    const execPrice = Number(p.executed_price);
+    const totalFees = ['commission', 'vat', 'fee', 'sec_fee', 'taf_fee']
+        .reduce((s, k) => s + (p[k] != null ? Math.abs(Number(p[k])) : 0), 0);
+
+    let qty: number, gross_usd: number, net_usd: number;
+
+    if (p.side === 'BUY') {
+        const inputAmount = Number(p.input_amount_usd);
+        gross_usd = inputAmount - totalFees;   // pure stock value = qty * price
+        qty = gross_usd / execPrice;
+        net_usd = inputAmount;                 // total cash deployed
+    } else {
+        qty = Number(p.input_shares);
+        gross_usd = qty * execPrice;
+        net_usd = gross_usd - totalFees;       // cash received after fees
+    }
+
+    const tradeDate = new Date(p.transaction_date as string).toISOString().slice(0, 10);
+
+    return {
+        order_no: null,
+        trade_date: tradeDate,
+        side: p.side,
+        symbol: String(p.symbol).toUpperCase().trim(),
+        market: null,
+        qty,
+        price: execPrice,
+        currency: 'USD',
+        gross_usd,
+        fee_usd: totalFees > 0 ? totalFees : null,
+        wht_usd: null,
+        net_usd,
+        gross_thb: null,
+        fee_thb: null,
+        wht_thb: null,
+        net_thb: null,
+        source: 'app',
+    };
 }
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
@@ -124,7 +166,7 @@ export default function AddTradePage() {
         setJsonError(null); setJsonSuccess(false); setBatchPreview(null); setBatchError(null);
         try {
             let raw = jsonInput.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-            raw = raw.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');
+            raw = raw.replace(/[‘’‚‛′‵“”„‟″‶]/g, '"');
             const arrMatch = raw.match(/\[[\s\S]*\]/);
             const objMatch = raw.match(/\{[\s\S]*\}/);
             if (arrMatch) {
@@ -162,34 +204,11 @@ export default function AddTradePage() {
         } catch (e) { setJsonError(getErrorMessage(e) || 'Could not parse JSON'); }
     };
 
-    const buildPayload = (p: Record<string, unknown>) => {
-        const execPrice = Number(p.executed_price);
-        const commission = p.commission != null ? Math.abs(Number(p.commission)) : null;
-        const vat = p.vat != null ? Math.abs(Number(p.vat)) : null;
-        const fee = p.fee != null ? Math.abs(Number(p.fee)) : null;
-        const sec_fee = p.sec_fee != null ? Math.abs(Number(p.sec_fee)) : null;
-        const taf_fee = p.taf_fee != null ? Math.abs(Number(p.taf_fee)) : null;
-        const totalFees = (commission ?? 0) + (vat ?? 0) + (fee ?? 0) + (sec_fee ?? 0) + (taf_fee ?? 0);
-        let shares: number | null = null, total_amount: number, input_amount_usd: number | null = null, input_shares: number | null = null, stock_amount: number | null = null;
-        if (p.side === 'BUY') {
-            input_amount_usd = Number(p.input_amount_usd);
-            stock_amount = input_amount_usd - totalFees;
-            shares = stock_amount / execPrice;
-            total_amount = input_amount_usd;
-        } else {
-            input_shares = Number(p.input_shares);
-            shares = input_shares;
-            stock_amount = input_shares * execPrice;
-            total_amount = stock_amount - totalFees;
-        }
-        return { side: p.side, transaction_date: new Date(p.transaction_date as string).toISOString(), symbol: String(p.symbol).toUpperCase().trim(), shares, total_amount, executed_price: execPrice, commission, vat, fee: fee === 0 ? null : fee, sec_fee: sec_fee === 0 ? null : sec_fee, taf_fee: taf_fee === 0 ? null : taf_fee, input_amount_usd: p.side === 'BUY' ? input_amount_usd : null, input_shares: p.side === 'SELL' ? input_shares : null, stock_amount, currency: 'USD' };
-    };
-
     const handleBatchSave = async () => {
         if (!batchPreview) return;
         setBatchError(null); setBatchSaving(true);
         try {
-            const { error } = await supabase.from('pantagon_financial_stock_trades').insert(batchPreview.map(buildPayload));
+            const { error } = await supabase.from('dime_trades').insert(batchPreview.map(buildDimePayload));
             if (error) throw error;
             toast.success(`${batchPreview.length} transactions imported`);
             navigate(-1);
@@ -203,32 +222,22 @@ export default function AddTradePage() {
         if (form.side === 'BUY' && !form.input_amount_usd) { setSaveError('Input Amount required for BUY.'); return; }
         if (form.side === 'SELL' && !form.input_shares) { setSaveError('Shares required for SELL.'); return; }
 
-        const execPrice = parseFloat(form.executed_price);
-        const fees = { commission: form.commission ? parseFloat(form.commission) : null, vat: form.vat ? parseFloat(form.vat) : null, fee: form.fee ? parseFloat(form.fee) : null, sec_fee: form.sec_fee ? parseFloat(form.sec_fee) : null, taf_fee: form.taf_fee ? parseFloat(form.taf_fee) : null };
-        const totalFees = Object.values(fees).reduce((s: number, v) => s + (v ?? 0), 0);
-        let shares: number, total_amount: number, stock_amount: number;
-        let input_amount_usd: number | null = null, input_shares: number | null = null;
-
-        if (form.side === 'BUY') {
-            input_amount_usd = parseFloat(form.input_amount_usd);
-            stock_amount = input_amount_usd - totalFees;
-            shares = stock_amount / execPrice;
-            total_amount = input_amount_usd;
-        } else {
-            input_shares = parseFloat(form.input_shares);
-            shares = input_shares;
-            stock_amount = input_shares * execPrice;
-            total_amount = stock_amount - totalFees;
-        }
-
         try {
             setSaving(true);
-            const { error } = await supabase.from('pantagon_financial_stock_trades').insert([{
-                side: form.side, transaction_date: new Date(form.transaction_date).toISOString(),
-                symbol: form.symbol.toUpperCase().trim(), shares, total_amount, executed_price: execPrice,
-                ...fees, input_amount_usd: form.side === 'BUY' ? input_amount_usd : null,
-                input_shares: form.side === 'SELL' ? input_shares : null, stock_amount, currency: 'USD',
-            }]);
+            const payload = buildDimePayload({
+                side: form.side,
+                transaction_date: form.transaction_date,
+                symbol: form.symbol,
+                executed_price: form.executed_price,
+                input_amount_usd: form.input_amount_usd || null,
+                input_shares: form.input_shares || null,
+                commission: form.commission || null,
+                vat: form.vat || null,
+                fee: form.fee || null,
+                sec_fee: form.sec_fee || null,
+                taf_fee: form.taf_fee || null,
+            });
+            const { error } = await supabase.from('dime_trades').insert([payload]);
             if (error) throw error;
             toast.success(`${form.side} recorded — ${form.symbol.toUpperCase()}`);
             navigate(-1);
@@ -240,7 +249,6 @@ export default function AddTradePage() {
 
     return (
         <div className="pt-4 pb-24">
-            {/* Back button */}
             <button
                 onClick={() => navigate(-1)}
                 className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-cyan-400 transition-colors mb-4 tracking-[0.1em]"
@@ -250,14 +258,13 @@ export default function AddTradePage() {
             </button>
 
             <div className="border border-border/30 bg-[oklch(0.12_0.018_255)] flex flex-col gap-0 overflow-visible">
-                {/* Header */}
                 <div className="px-4 py-4 flex items-center gap-2">
                     <div className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.16em]">New Trade</span>
                 </div>
 
                 <div className="flex flex-col gap-5 px-4 pb-0">
-                    {/* BUY / SELL toggle - rectangle style */}
+                    {/* BUY / SELL toggle */}
                     <div className="grid grid-cols-2 gap-0 border border-border/30">
                         {(['BUY', 'SELL'] as Side[]).map((s) => (
                             <button
@@ -306,7 +313,7 @@ export default function AddTradePage() {
                                 />
                                 {jsonError && <p className="text-[10px] text-rose-400 bg-rose-500/10 px-3 py-2 border border-rose-500/20">{jsonError}</p>}
                                 {jsonSuccess && !batchPreview && <p className="text-[10px] text-emerald-400 bg-emerald-500/10 px-3 py-2 border border-emerald-500/20 flex items-center gap-2"><Check className="size-3" /> Fields filled successfully!</p>}
-                                
+
                                 {batchPreview && (
                                     <div className="flex flex-col gap-2 bg-black/20 p-2 border border-amber-500/20">
                                         <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">{batchPreview.length} items ready:</p>

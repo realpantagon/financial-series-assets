@@ -36,21 +36,23 @@ export interface PantagonSalaryLog {
 }
 
 export interface DimeTransaction {
-  id: string; // uuid
-  side: 'BUY' | 'SELL' | 'INIT';
-  transaction_date: string; // ISO timestamp
-  symbol: string | null;
-  shares: number | null;
-  total_amount: number;
-  executed_price: number;
-  commission: number | null;
-  vat: number | null;
-  fee: number | null;
-  created_at?: string | null;
-  input_amount_usd: number | null;  // For BUY: the USD amount input
-  input_shares: number | null;      // For SELL: the shares input
-  stock_amount: number | null;
-  sec_fee: number | null;
-  taf_fee: number | null;
+  id: number;                // bigint from dime_trades
+  order_no: string | null;
+  trade_date: string;        // date YYYY-MM-DD
+  side: 'BUY' | 'SELL';
+  symbol: string;
+  market: string | null;
+  qty: number;               // shares
+  price: number;             // price per share
   currency: string | null;
+  gross_usd: number | null;  // qty * price
+  fee_usd: number | null;    // total fees
+  wht_usd: number | null;
+  net_usd: number | null;    // cash received (SELL) or total spent (BUY)
+  gross_thb: number | null;
+  fee_thb: number | null;
+  wht_thb: number | null;
+  net_thb: number | null;
+  source: string | null;
+  created_at?: string | null;
 }

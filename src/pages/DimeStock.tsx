@@ -20,6 +20,7 @@ import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
     Trash2, Inbox, Activity, Check, Filter
 } from 'lucide-react';
+import DimeStockAnalytics from './DimeStockAnalytics';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ interface SymbolSummary {
     latestDate: string;
     totalStockAmount: number;
     totalSharesSold: number;
+    realizedPL: number;
 }
 
 // ─── SidePill ─────────────────────────────────────────────────────────────────
@@ -52,8 +54,7 @@ function SidePill({ side }: { side: string }) {
         <span className={cn(
             'inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border tracking-wider',
             side === 'BUY'  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25' :
-            side === 'SELL' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' :
-                              'bg-violet-500/10 text-violet-400 border-violet-500/25'
+                              'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
         )}>
             {side}
         </span>
@@ -71,14 +72,16 @@ function FeePill({ label, value }: { label: string; value: number | null | undef
 
 // ─── Trade row ────────────────────────────────────────────────────────────────
 
-function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: string) => void }) {
-    const isIn = tx.side === 'BUY' || tx.side === 'INIT';
+function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: number) => void }) {
+    const isBuy = tx.side === 'BUY';
+    const displayAmount = isBuy
+        ? (tx.gross_usd ?? 0) + (tx.fee_usd ?? 0)
+        : (tx.net_usd ?? 0);
+
     return (
         <div className="group flex items-start gap-2.5 px-3 py-2.5 border-b border-border/20 last:border-0 hover:bg-white/1 transition-colors">
-            {/* Side accent bar */}
             <div className={cn('w-0.5 self-stretch rounded-full shrink-0 mt-0.5',
-                tx.side === 'BUY'  ? 'bg-cyan-500' :
-                tx.side === 'SELL' ? 'bg-emerald-500' : 'bg-violet-500'
+                isBuy ? 'bg-cyan-500' : 'bg-emerald-500'
             )} />
 
             <div className="flex-1 min-w-0">
@@ -86,13 +89,13 @@ function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: string
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono font-black text-sm text-foreground">{tx.symbol}</span>
                         <SidePill side={tx.side} />
-                        <span className="text-[9px] text-muted-foreground/50 font-mono">{formatDate(tx.transaction_date)}</span>
+                        <span className="text-[9px] text-muted-foreground/50 font-mono">{formatDate(tx.trade_date)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <span className={cn('font-mono font-bold text-sm',
-                            isIn ? 'text-foreground' : 'text-emerald-400'
+                            isBuy ? 'text-foreground' : 'text-emerald-400'
                         )}>
-                            {tx.side === 'INIT' ? fmt(tx.stock_amount) : fmt(tx.total_amount)}
+                            {fmt(displayAmount)}
                         </span>
                         <button
                             onClick={() => onDelete(tx.id)}
@@ -103,13 +106,11 @@ function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: string
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                    {tx.shares != null && (
-                        <span className="text-[9px] font-mono text-muted-foreground/50">{Number(tx.shares).toFixed(7)} sh @ {fmt(tx.executed_price)}</span>
-                    )}
-                    <FeePill label="comm" value={tx.commission} />
-                    <FeePill label="VAT" value={tx.vat} />
-                    <FeePill label="SEC" value={tx.sec_fee} />
-                    <FeePill label="TAF" value={tx.taf_fee} />
+                    <span className="text-[9px] font-mono text-muted-foreground/50">
+                        {Number(tx.qty).toFixed(7)} sh @ {fmt(tx.price)}
+                    </span>
+                    <FeePill label="fee" value={tx.fee_usd} />
+                    <FeePill label="wht" value={tx.wht_usd} />
                 </div>
             </div>
         </div>
@@ -119,9 +120,8 @@ function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: string
 // ─── Position Card ────────────────────────────────────────────────────────────
 
 function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void }) {
-    const realized = s.totalSellAmount > 0 ? s.totalSellAmount - (s.totalSharesSold * s.avgBuyPrice) : 0;
     const hasSold = s.totalSellAmount > 0;
-    const plPositive = realized >= 0;
+    const plPositive = s.realizedPL >= 0;
     const hasPosition = s.totalShares > 0;
 
     return (
@@ -129,14 +129,12 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
             onClick={onClick}
             className="w-full text-left border border-border/25 rounded-xl bg-[oklch(0.12_0.015_255)] hover:border-cyan-500/20 hover:shadow-[0_0_20px_oklch(0.68_0.18_210/0.06)] transition-all duration-200 active:scale-[0.99] overflow-hidden group"
         >
-            {/* Top accent */}
             <div className={cn('h-px w-full', hasPosition
                 ? 'bg-gradient-to-r from-cyan-500/50 to-transparent'
                 : 'bg-gradient-to-r from-emerald-500/30 to-transparent'
             )} />
 
             <div className="p-4">
-                {/* Header row */}
                 <div className="flex items-start justify-between mb-3">
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
@@ -151,14 +149,13 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                                 plPositive ? 'text-emerald-400' : 'text-rose-400'
                             )}>
                                 {plPositive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                                {plPositive ? '+' : ''}{fmt(realized)}
+                                {plPositive ? '+' : ''}{fmt(s.realizedPL)}
                             </div>
                         )}
                         <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
                     </div>
                 </div>
 
-                {/* Position value */}
                 <div className="mb-3">
                     <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">Position</p>
                     <p className="font-mono font-black text-xl text-cyan-300 tracking-tight">{fmt(s.totalStockAmount)}</p>
@@ -167,7 +164,25 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                     )}
                 </div>
 
-                {/* Stats */}
+                <div className={cn(
+                    'mb-3 border px-3 py-2 rounded-lg',
+                    hasSold
+                        ? plPositive
+                            ? 'bg-emerald-500/6 border-emerald-500/15'
+                            : 'bg-rose-500/6 border-rose-500/15'
+                        : 'bg-white/3 border-border/15'
+                )}>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em]">Realized P&L</p>
+                        <p className={cn(
+                            'font-mono font-black text-sm',
+                            !hasSold ? 'text-muted-foreground/35' : plPositive ? 'text-emerald-400' : 'text-rose-400'
+                        )}>
+                            {hasSold && plPositive ? '+' : ''}{fmt(hasSold ? s.realizedPL : 0)}
+                        </p>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-4 pt-2.5 border-t border-border/15">
                     <div>
                         <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Avg Cost</p>
@@ -196,12 +211,11 @@ export default function DimeStock() {
     const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [deleteId, setDeleteId] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState('portfolio');
     const [symbolFilter, setSymbolFilter] = useState('');
     const [filterOpen, setFilterOpen] = useState(false);
 
-    // Close filter on click outside
     useEffect(() => {
         if (!filterOpen) return;
         const handler = () => setFilterOpen(false);
@@ -212,7 +226,10 @@ export default function DimeStock() {
     const fetchTransactions = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase.from('pantagon_financial_stock_trades').select('*').order('transaction_date', { ascending: false });
+            const { data, error } = await supabase
+                .from('dime_trades')
+                .select('*')
+                .order('trade_date', { ascending: false });
             if (error) throw error;
             setTransactions((data as DimeTransaction[]) || []);
         } catch (err) { setError(getErrorMessage(err)); }
@@ -223,56 +240,95 @@ export default function DimeStock() {
 
     const symbolSummaries: SymbolSummary[] = useMemo(() => {
         const map: Record<string, SymbolSummary> = {};
-        transactions.filter(t => t.side === 'BUY' || t.side === 'INIT').forEach((tx) => {
-            const sym = tx.symbol || 'UNKNOWN';
-            if (!map[sym]) map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0, totalSharesSold: 0 };
-            map[sym].txCount++;
-            if (tx.transaction_date > map[sym].latestDate) map[sym].latestDate = tx.transaction_date;
-            map[sym].totalBuyAmount += tx.side === 'INIT' ? Number(tx.stock_amount ?? 0) : Number(tx.total_amount);
-            map[sym].totalShares += Number(tx.shares ?? 0);
-            map[sym].totalStockAmount += Number(tx.stock_amount ?? 0);
+        const emptySummary = (symbol: string, latestDate: string): SymbolSummary => ({
+            symbol,
+            totalBuyAmount: 0,
+            totalSellAmount: 0,
+            totalShares: 0,
+            avgBuyPrice: 0,
+            txCount: 0,
+            latestDate,
+            totalStockAmount: 0,
+            totalSharesSold: 0,
+            realizedPL: 0,
         });
+
+        transactions.filter(t => t.side === 'BUY').forEach((tx) => {
+            const sym = tx.symbol || 'UNKNOWN';
+            const summary = map[sym] ?? emptySummary(sym, tx.trade_date);
+
+            summary.txCount++;
+            if (tx.trade_date > summary.latestDate) summary.latestDate = tx.trade_date;
+            summary.totalBuyAmount += Number(tx.gross_usd ?? 0) + Number(tx.fee_usd ?? 0);
+            summary.totalShares += Number(tx.qty);
+            summary.totalStockAmount += Number(tx.gross_usd ?? 0);
+
+            map[sym] = summary;
+        });
+
         Object.values(map).forEach((s) => { s.avgBuyPrice = s.totalShares > 0 ? s.totalStockAmount / s.totalShares : 0; });
+
         transactions.filter(t => t.side === 'SELL').forEach((tx) => {
             const sym = tx.symbol || 'UNKNOWN';
-            if (!map[sym]) map[sym] = { symbol: sym, totalBuyAmount: 0, totalSellAmount: 0, totalShares: 0, avgBuyPrice: 0, txCount: 0, latestDate: tx.transaction_date, totalStockAmount: 0, totalSharesSold: 0 };
-            map[sym].txCount++;
-            if (tx.transaction_date > map[sym].latestDate) map[sym].latestDate = tx.transaction_date;
-            const sharesSold = Number(tx.shares ?? 0);
-            map[sym].totalSellAmount += Number(tx.total_amount);
-            map[sym].totalSharesSold += sharesSold;
-            map[sym].totalShares -= sharesSold;
-            map[sym].totalStockAmount -= sharesSold * map[sym].avgBuyPrice;
+            const summary = map[sym] ?? emptySummary(sym, tx.trade_date);
+
+            summary.txCount++;
+            if (tx.trade_date > summary.latestDate) summary.latestDate = tx.trade_date;
+
+            const sharesSold = Number(tx.qty);
+            summary.totalSellAmount += Number(tx.net_usd ?? 0);
+            summary.totalSharesSold += sharesSold;
+            summary.totalShares -= sharesSold;
+            summary.totalStockAmount -= sharesSold * summary.avgBuyPrice;
+
+            map[sym] = summary;
         });
+
         Object.values(map).forEach((s) => {
+            s.realizedPL = s.totalSellAmount > 0 ? s.totalSellAmount - (s.totalSharesSold * s.avgBuyPrice) : 0;
             if (s.totalShares <= 0.000001) { s.totalShares = 0; s.totalStockAmount = 0; }
             else s.totalStockAmount = Math.max(0, s.totalStockAmount);
         });
-        return Object.values(map).sort((a, b) => b.totalStockAmount - a.totalStockAmount);
+
+        return Object.values(map).sort((a, b) => {
+            const positionCompare = b.totalStockAmount - a.totalStockAmount;
+            return positionCompare !== 0 ? positionCompare : b.realizedPL - a.realizedPL;
+        });
     }, [transactions]);
 
-    const filteredSummaries = useMemo(() => 
+    const filteredSummaries = useMemo(() =>
         symbolFilter ? symbolSummaries.filter(s => s.symbol === symbolFilter) : symbolSummaries
     , [symbolSummaries, symbolFilter]);
 
-    const filteredTransactions = useMemo(() => 
+    const filteredTransactions = useMemo(() =>
         symbolFilter ? transactions.filter(t => t.symbol === symbolFilter) : transactions
     , [transactions, symbolFilter]);
 
     const overallBuy = useMemo(() =>
-        transactions.filter(t => t.side === 'INIT').reduce((s, t) => s + Number(t.stock_amount ?? 0), 0) +
-        transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.total_amount), 0)
+        transactions.filter(t => t.side === 'BUY').reduce((s, t) => s + Number(t.gross_usd ?? 0) + Number(t.fee_usd ?? 0), 0)
     , [transactions]);
-    const overallSell = useMemo(() => transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.total_amount), 0), [transactions]);
-    const netPL = useMemo(() => symbolSummaries.reduce((total, s) => {
-        if (s.totalSellAmount === 0) return total;
-        const realized = s.totalSellAmount - (s.totalSharesSold * s.avgBuyPrice);
-        return total + realized;
-    }, 0), [symbolSummaries]);
 
-    const handleDelete = async (id: string) => {
+    const overallSell = useMemo(() =>
+        transactions.filter(t => t.side === 'SELL').reduce((s, t) => s + Number(t.net_usd ?? 0), 0)
+    , [transactions]);
+
+    const realizedProfit = useMemo(() =>
+        symbolSummaries.reduce((total, s) => total + Math.max(s.realizedPL, 0), 0)
+    , [symbolSummaries]);
+
+    const realizedLoss = useMemo(() =>
+        symbolSummaries.reduce((total, s) => total + Math.min(s.realizedPL, 0), 0)
+    , [symbolSummaries]);
+
+    const netPL = realizedProfit + realizedLoss;
+
+    const plSymbols = useMemo(() =>
+        symbolSummaries.filter(s => s.totalSellAmount > 0).length
+    , [symbolSummaries]);
+
+    const handleDelete = async (id: number) => {
         try {
-            const { error } = await supabase.from('pantagon_financial_stock_trades').delete().eq('id', id);
+            const { error } = await supabase.from('dime_trades').delete().eq('id', id);
             if (error) throw error;
             setDeleteId(null);
             await fetchTransactions();
@@ -315,26 +371,31 @@ export default function DimeStock() {
                 <Activity className="absolute -right-3 -top-3 size-20 text-cyan-500/4" />
                 <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
                 <div className="relative">
-                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-1">Total Portfolio Value</p>
-                    <p className="font-mono font-black text-3xl text-foreground tracking-tight">{fmt(overallBuy)}</p>
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/15">
+                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-1">Realized Net P&L</p>
+                    <p className={cn('font-mono font-black text-3xl tracking-tight', netPL >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                        {netPL >= 0 ? '+' : ''}{fmt(netPL)}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 pt-3 border-t border-border/15">
+                        <div>
+                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Profit</p>
+                            <p className="font-mono text-xs font-bold text-emerald-400">+{fmt(realizedProfit)}</p>
+                        </div>
+                        <div>
+                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Loss</p>
+                            <p className="font-mono text-xs font-bold text-rose-400">{realizedLoss < 0 ? '-' : ''}{fmt(Math.abs(realizedLoss))}</p>
+                        </div>
                         <div>
                             <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Sold</p>
                             <p className="font-mono text-xs font-bold text-emerald-400">{fmt(overallSell)}</p>
                         </div>
-                        <div className="w-px h-5 bg-border/20" />
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Net P&L</p>
-                            <p className={cn('font-mono text-xs font-bold', netPL >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                                {netPL >= 0 ? '+' : ''}{fmt(netPL)}
-                            </p>
-                        </div>
-                        <div className="w-px h-5 bg-border/20" />
-                        <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Symbols</p>
-                            <p className="font-mono text-xs font-bold text-foreground">{symbolSummaries.length}</p>
+                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Invested</p>
+                            <p className="font-mono text-xs font-bold text-foreground">{fmt(overallBuy)}</p>
                         </div>
                     </div>
+                    <p className="mt-3 text-[9px] font-mono text-muted-foreground/35 tracking-wider">
+                        {plSymbols} symbols with realized P&L
+                    </p>
                 </div>
             </div>
 
@@ -342,17 +403,20 @@ export default function DimeStock() {
             <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
-                        <TabsList className="w-full grid grid-cols-2 h-9 bg-black/30 border border-border/20 p-0 rounded-none">
+                        <TabsList className="w-full grid grid-cols-3 h-9 bg-black/30 border border-border/20 p-0 rounded-none">
                             <TabsTrigger value="portfolio" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none border-r border-border/20">
                                 PORTFOLIO
                             </TabsTrigger>
-                            <TabsTrigger value="trades" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none">
+                            <TabsTrigger value="trades" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none border-r border-border/20">
                                 TRADES
+                            </TabsTrigger>
+                            <TabsTrigger value="stats" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none">
+                                STATS
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
-                    
-                    <div className="relative">
+
+                    <div className={cn('relative', activeTab === 'stats' && 'invisible pointer-events-none')}>
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setFilterOpen(!filterOpen); }}
@@ -365,7 +429,7 @@ export default function DimeStock() {
                             {symbolFilter || 'ALL'}
                             <ChevronDown className={cn("size-3 opacity-50", filterOpen && "rotate-180")} />
                         </button>
-                        
+
                         {filterOpen && (
                             <div className="absolute right-0 top-[calc(100%+4px)] w-48 z-50 bg-[oklch(0.12_0.02_250)] border border-border/30 shadow-2xl overflow-hidden max-h-60 flex flex-col">
                                 <button
@@ -395,7 +459,6 @@ export default function DimeStock() {
                     </div>
                 </div>
 
-                {/* Portfolio tab content */}
                 {activeTab === 'portfolio' && (
                     <div className="w-full">
                         {filteredSummaries.length === 0 ? (
@@ -417,7 +480,8 @@ export default function DimeStock() {
                     </div>
                 )}
 
-                {/* Trades tab content */}
+                {activeTab === 'stats' && <DimeStockAnalytics transactions={transactions} />}
+
                 {activeTab === 'trades' && (
                     <div className="w-full">
                         {filteredTransactions.length === 0 ? (
@@ -429,7 +493,7 @@ export default function DimeStock() {
                             <div className="border border-border/20 rounded-none bg-[oklch(0.11_0.015_255/0.7)] overflow-hidden">
                                 {[...filteredTransactions]
                                     .sort((a, b) => {
-                                        const d = b.transaction_date.localeCompare(a.transaction_date);
+                                        const d = b.trade_date.localeCompare(a.trade_date);
                                         return d !== 0 ? d : (b.created_at ?? '').localeCompare(a.created_at ?? '');
                                     })
                                     .map(tx => <TradeRow key={tx.id} tx={tx} onDelete={(id) => setDeleteId(id)} />)
@@ -440,7 +504,6 @@ export default function DimeStock() {
                 )}
             </div>
 
-            {/* Delete confirm */}
             <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
                 <AlertDialogContent className="bg-[oklch(0.12_0.018_255)] border-border/40">
                     <AlertDialogHeader>
@@ -451,7 +514,7 @@ export default function DimeStock() {
                         <AlertDialogCancel className="border-border/30 text-xs h-9">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-rose-500/70 hover:bg-rose-500 text-white border-rose-500/20 text-xs h-9"
-                            onClick={() => deleteId && handleDelete(deleteId)}
+                            onClick={() => deleteId !== null && handleDelete(deleteId)}
                         >
                             Delete
                         </AlertDialogAction>
