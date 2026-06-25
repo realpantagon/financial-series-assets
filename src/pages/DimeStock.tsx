@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
 import { useDailyPrices } from '@/hooks/useDailyPrices';
-import type { PriceQuote } from '@/lib/dailyPrices';
+import type { PriceQuote, PriceMap } from '@/lib/dailyPrices';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -192,6 +192,15 @@ function PositionCard({ s, onClick, price }: { s: SymbolSummary; onClick: () => 
                                 </div>
                             </div>
                         )}
+                        {/* Break-even hint for losing positions */}
+                        {hasPosition && unrealPL !== null && unrealPL < 0 && price.c > 0 && (
+                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-amber-500/10">
+                                <span className="text-[8px] text-amber-400/50 uppercase tracking-wider">Break-even</span>
+                                <span className="text-[8px] font-mono text-amber-400/70">
+                                    ↑ {((s.avgBuyPrice - price.c) / price.c * 100).toFixed(1)}% · ${s.avgBuyPrice.toFixed(2)}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -278,19 +287,51 @@ function fmtCompact(v: number): string {
     return `${sign}$${abs.toFixed(0)}`;
 }
 
-function PortfolioMap({ summaries, onSymbolClick }: {
+function PortfolioMap({ summaries, onSymbolClick, prices }: {
     summaries: SymbolSummary[];
     onSymbolClick: (sym: string) => void;
+    prices: PriceMap;
 }) {
-    const sorted = [...summaries].sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
-    if (sorted.length === 0) return null;
+    const [mapView, setMapView] = useState<'cost' | 'value'>('cost');
 
-    const maxAlloc = sorted[0].allocationPct;
+    if (summaries.length === 0) return null;
+
+    // Sort by relevant metric
+    const sorted = [...summaries].sort((a, b) => {
+        if (mapView === 'value') {
+            const qA = prices[a.symbol];
+            const qB = prices[b.symbol];
+            const mA = qA && a.totalShares > 0 ? qA.c * a.totalShares : a.totalBuyAmount;
+            const mB = qB && b.totalShares > 0 ? qB.c * b.totalShares : b.totalBuyAmount;
+            return mB - mA;
+        }
+        return b.totalBuyAmount - a.totalBuyAmount;
+    });
+
+    // Compute denominator for allocation %
+    const totalForView = sorted.reduce((sum, s) => {
+        if (mapView === 'value') {
+            const q = prices[s.symbol];
+            return sum + (q && s.totalShares > 0 ? q.c * s.totalShares : s.totalBuyAmount);
+        }
+        return sum + s.totalBuyAmount;
+    }, 0);
+
+    const getAlloc = (s: SymbolSummary): number => {
+        if (mapView === 'value') {
+            const q = prices[s.symbol];
+            const val = q && s.totalShares > 0 ? q.c * s.totalShares : s.totalBuyAmount;
+            return totalForView > 0 ? (val / totalForView) * 100 : 0;
+        }
+        return s.allocationPct;
+    };
+
+    const maxAlloc = Math.max(...sorted.map(getAlloc), 1);
 
     return (
         <div className="flex flex-col gap-2">
 
-            {/* Allocation strip — visual overview of the whole portfolio */}
+            {/* Allocation strip */}
             <div className="h-3 flex rounded-sm overflow-hidden bg-black/30 gap-px">
                 {sorted.map(s => {
                     const hasSells = s.totalSellAmount > 0;
@@ -302,9 +343,9 @@ function PortfolioMap({ summaries, onSymbolClick }: {
                     return (
                         <button key={s.symbol}
                             onClick={() => onSymbolClick(s.symbol)}
-                            title={`${s.symbol} ${s.allocationPct.toFixed(1)}%`}
+                            title={`${s.symbol} ${getAlloc(s).toFixed(1)}%`}
                             className={cn('h-full shrink-0 hover:brightness-125 transition-all', fill)}
-                            style={{ width: `${s.allocationPct}%` }}
+                            style={{ width: `${getAlloc(s)}%` }}
                         />
                     );
                 })}
@@ -314,51 +355,56 @@ function PortfolioMap({ summaries, onSymbolClick }: {
             <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
                 {sorted.map((s, i) => {
                     const hasSells = s.totalSellAmount > 0;
-                    const plPos = s.realizedPL >= 0;
                     const hasPos = s.totalShares > 0;
-                    const barW = `${(s.allocationPct / maxAlloc) * 100}%`;
+                    const q = prices[s.symbol];
+                    const allocPct = getAlloc(s);
+                    const barW = `${(allocPct / maxAlloc) * 100}%`;
+
+                    // In value mode: show unrealized %; otherwise: realized %
+                    let barText = '';
+                    let plColor = 'text-muted-foreground/30';
+                    if (mapView === 'value' && q && hasPos) {
+                        const unrealPct = s.avgBuyPrice > 0 ? ((q.c - s.avgBuyPrice) / s.avgBuyPrice) * 100 : 0;
+                        const pos = unrealPct >= 0;
+                        barText = `${pos ? '+' : ''}${unrealPct.toFixed(1)}% unreal`;
+                        plColor = pos ? 'text-emerald-400' : 'text-rose-400';
+                    } else if (hasSells) {
+                        const plPos = s.realizedPL >= 0;
+                        barText = `${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}%`;
+                        plColor = plPos ? 'text-emerald-400' : 'text-rose-400';
+                    } else {
+                        barText = hasPos ? 'holding' : 'closed';
+                    }
 
                     const barBg = hasSells
-                        ? plPos ? 'bg-emerald-500/20' : 'bg-rose-500/20'
+                        ? s.realizedPL >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'
                         : hasPos ? 'bg-cyan-500/12' : 'bg-border/10';
-
-                    const plColor = hasSells
-                        ? plPos ? 'text-emerald-400' : 'text-rose-400'
-                        : 'text-muted-foreground/30';
 
                     return (
                         <button key={s.symbol}
                             onClick={() => onSymbolClick(s.symbol)}
                             className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:bg-white/[0.04] hover:bg-white/[0.02] transition-colors">
 
-                            {/* Rank */}
                             <span className="text-[8px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right leading-none">{i + 1}</span>
-
-                            {/* Symbol */}
                             <span className="font-mono font-black text-[11px] text-foreground w-[52px] shrink-0 truncate leading-none">{s.symbol}</span>
 
-                            {/* Bar track */}
                             <div className="flex-1 relative h-[22px] bg-black/20 overflow-hidden">
-                                <div className={cn('absolute inset-y-0 left-0', barBg)}
-                                    style={{ width: barW }} />
+                                <div className={cn('absolute inset-y-0 left-0', barBg)} style={{ width: barW }} />
                                 <div className="absolute inset-0 flex items-center px-1.5">
-                                    <span className={cn('text-[9px] font-mono font-bold leading-none', plColor)}>
-                                        {hasSells
-                                            ? `${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}%`
-                                            : hasPos ? 'holding' : 'closed'}
-                                    </span>
+                                    <span className={cn('text-[9px] font-mono font-bold leading-none', plColor)}>{barText}</span>
                                 </div>
                             </div>
 
-                            {/* Right: P&L $ + alloc% */}
                             <div className="shrink-0 text-right w-16">
                                 {hasSells && (
-                                    <span className={cn('font-mono font-bold text-[10px] block leading-snug', plColor)}>
+                                    <span className={cn('font-mono font-bold text-[10px] block leading-snug',
+                                        s.realizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                    )}>
                                         {fmtCompact(s.realizedPL)}
                                     </span>
                                 )}
                                 <span className="text-[8px] font-mono text-muted-foreground/30 block leading-snug">
-                                    {s.allocationPct.toFixed(1)}%
+                                    {allocPct.toFixed(1)}%
                                 </span>
                             </div>
                         </button>
@@ -366,19 +412,34 @@ function PortfolioMap({ summaries, onSymbolClick }: {
                 })}
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-3 flex-wrap">
-                {[
-                    { color: 'bg-emerald-500/60', label: 'Profit' },
-                    { color: 'bg-rose-500/60',    label: 'Loss' },
-                    { color: 'bg-cyan-500/40',    label: 'Holding' },
-                ].map(({ color, label }) => (
-                    <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
-                        <span className={cn('size-2 rounded-sm shrink-0', color)} />
-                        {label}
-                    </span>
-                ))}
-                <span className="text-[8px] font-mono text-muted-foreground/25 ml-auto">bar width = % of portfolio</span>
+            {/* Legend + view toggle */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-3">
+                    {[
+                        { color: 'bg-emerald-500/60', label: 'Profit' },
+                        { color: 'bg-rose-500/60',    label: 'Loss' },
+                        { color: 'bg-cyan-500/40',    label: 'Holding' },
+                    ].map(({ color, label }) => (
+                        <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
+                            <span className={cn('size-2 rounded-sm shrink-0', color)} />
+                            {label}
+                        </span>
+                    ))}
+                </div>
+                <div className="flex items-center gap-px text-[7px] font-mono font-bold">
+                    <button onClick={() => setMapView('cost')}
+                        className={cn('px-1.5 py-0.5 border transition-all',
+                            mapView === 'cost'
+                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+                                : 'bg-black/20 border-border/20 text-muted-foreground/30 hover:text-muted-foreground/60'
+                        )}>COST</button>
+                    <button onClick={() => setMapView('value')}
+                        className={cn('px-1.5 py-0.5 border border-l-0 transition-all',
+                            mapView === 'value'
+                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+                                : 'bg-black/20 border-border/20 text-muted-foreground/30 hover:text-muted-foreground/60'
+                        )}>VALUE</button>
+                </div>
             </div>
         </div>
     );
@@ -662,6 +723,7 @@ export default function DimeStock() {
                 <PortfolioMap
                     summaries={symbolSummaries}
                     onSymbolClick={(sym) => navigate(`/dime-stock/${sym}`)}
+                    prices={prices}
                 />
             )}
 

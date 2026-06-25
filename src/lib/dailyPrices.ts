@@ -11,7 +11,6 @@ const KEY_PREFIX = 'panassets_prices_';
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 1100; // keep under Finnhub free tier (60 req/min)
 
-// Symbols that map to gold spot via metals.live instead of Finnhub
 const GOLD_SYMBOLS = new Set(['XAU', 'XAUUSD', 'XAUSD', 'GOLD_SPOT']);
 
 function todayKey(): string {
@@ -28,15 +27,17 @@ export function getCachedPrices(): PriceMap | null {
     }
 }
 
-function savePrices(prices: PriceMap): void {
-    // Clean up yesterday's cache entries
-    for (let i = 0; i < localStorage.length; i++) {
+// Merge new prices into today's cache so multiple callers don't overwrite each other
+function savePrices(newPrices: PriceMap): void {
+    // Evict yesterday's entries
+    for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k?.startsWith(KEY_PREFIX) && k !== todayKey()) {
-            localStorage.removeItem(k);
-        }
+        if (k?.startsWith(KEY_PREFIX) && k !== todayKey()) localStorage.removeItem(k);
     }
-    try { localStorage.setItem(todayKey(), JSON.stringify(prices)); } catch {}
+    try {
+        const existing = getCachedPrices() ?? {};
+        localStorage.setItem(todayKey(), JSON.stringify({ ...existing, ...newPrices }));
+    } catch {}
 }
 
 async function fetchFinnhub(symbol: string, apiKey: string): Promise<PriceQuote | null> {
@@ -46,7 +47,6 @@ async function fetchFinnhub(symbol: string, apiKey: string): Promise<PriceQuote 
         );
         if (!r.ok) return null;
         const d = await r.json();
-        // Finnhub returns c=0 when symbol is unknown
         if (!d.c || d.c === 0) return null;
         return { c: d.c, d: d.d ?? 0, dp: d.dp ?? 0, pc: d.pc ?? d.c };
     } catch {
@@ -59,7 +59,6 @@ async function fetchGoldSpot(): Promise<PriceQuote | null> {
         const r = await fetch('https://api.metals.live/v1/spot/gold');
         if (!r.ok) return null;
         const d = await r.json();
-        // Response can be { gold: 2354.12 } or [{ gold: 2354.12 }]
         const price: number = Array.isArray(d) ? d[0]?.gold : d?.gold;
         if (!price) return null;
         return { c: price, d: 0, dp: 0, pc: price };

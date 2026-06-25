@@ -10,6 +10,7 @@ import {
     ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { toast } from 'sonner';
+import { useDailyPrices } from '@/hooks/useDailyPrices';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,10 @@ export default function SymbolDetailPage() {
         : 0;
     const plPositive = realized >= 0;
 
+    // Live price — reads from today's cache first, fetches if missing
+    const { prices } = useDailyPrices(symbol ? [symbol] : []);
+    const livePrice = symbol ? prices[symbol] : undefined;
+
     const chartData = useMemo(() => {
         let cumPL = 0;
         return [...symTxs]
@@ -204,6 +209,51 @@ export default function SymbolDetailPage() {
                             </div>
                         )}
                     </div>
+
+                    {/* Live price + unrealized P&L */}
+                    {livePrice && (
+                        <div className="mb-5 border border-border/20 bg-black/20 rounded-lg px-4 py-3">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <div className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-1">Live Price</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-xl text-foreground/90">${livePrice.c.toFixed(2)}</span>
+                                        <span className={cn(
+                                            'text-[9px] font-mono font-bold px-1.5 py-0.5 rounded',
+                                            livePrice.dp >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                                        )}>
+                                            {livePrice.dp >= 0 ? '+' : ''}{livePrice.dp.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                    <div className="text-[9px] font-mono text-muted-foreground/35 mt-0.5">
+                                        prev close ${livePrice.pc.toFixed(2)}
+                                    </div>
+                                </div>
+                                {summary.totalShares > 0 && (() => {
+                                    const unreal = (livePrice.c - summary.avgBuyPrice) * summary.totalShares;
+                                    const unrealPct = summary.avgBuyPrice > 0
+                                        ? ((livePrice.c - summary.avgBuyPrice) / summary.avgBuyPrice) * 100 : 0;
+                                    const pos = unreal >= 0;
+                                    return (
+                                        <div className="text-right">
+                                            <div className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-1">Unrealized</div>
+                                            <div className={cn('font-mono font-bold text-xl', pos ? 'text-emerald-400' : 'text-rose-400')}>
+                                                {pos ? '+' : ''}{fmt(unreal)}
+                                            </div>
+                                            <div className={cn('text-[10px] font-mono', pos ? 'text-emerald-400/60' : 'text-rose-400/60')}>
+                                                {unrealPct >= 0 ? '+' : ''}{unrealPct.toFixed(2)}%
+                                            </div>
+                                            {!pos && (
+                                                <div className="text-[8px] font-mono text-amber-400/60 mt-0.5">
+                                                    ↑ {((summary.avgBuyPrice - livePrice.c) / livePrice.c * 100).toFixed(1)}% to b/e
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex items-start gap-6 pt-3 border-t border-border/20">
                         <Stat label="Avg Buy" value={fmt(summary.avgBuyPrice)} className="text-foreground/80" />

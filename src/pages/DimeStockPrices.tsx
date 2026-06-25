@@ -46,12 +46,15 @@ interface OpenPos {
     totalBuyAmount: number;
 }
 
+type PosSort = 'mktVal' | 'unrealPL' | 'unrealPct' | 'todayChg' | 'sym';
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DimeStockPrices() {
     const navigate = useNavigate();
     const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [posSort, setPosSort] = useState<PosSort>('mktVal');
 
     const fetchTx = useCallback(async () => {
         setLoading(true);
@@ -73,9 +76,9 @@ export default function DimeStockPrices() {
 
         transactions.filter(t => t.side === 'BUY').forEach(tx => {
             const sym = tx.symbol;
-            buyShares[sym]    = (buyShares[sym]    ?? 0) + Number(tx.qty);
-            buyStockAmt[sym]  = (buyStockAmt[sym]  ?? 0) + Number(tx.gross_usd ?? 0);
-            buyTotalAmt[sym]  = (buyTotalAmt[sym]  ?? 0) + Number(tx.gross_usd ?? 0) + Number(tx.fee_usd ?? 0);
+            buyShares[sym]   = (buyShares[sym]   ?? 0) + Number(tx.qty);
+            buyStockAmt[sym] = (buyStockAmt[sym] ?? 0) + Number(tx.gross_usd ?? 0);
+            buyTotalAmt[sym] = (buyTotalAmt[sym] ?? 0) + Number(tx.gross_usd ?? 0) + Number(tx.fee_usd ?? 0);
         });
 
         const avgCost: Record<string, number> = {};
@@ -95,8 +98,7 @@ export default function DimeStockPrices() {
                 totalShares: remShares[sym],
                 avgBuyPrice: avgCost[sym] ?? 0,
                 totalBuyAmount: buyTotalAmt[sym] ?? 0,
-            }))
-            .sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
+            }));
     }, [transactions]);
 
     const openSymbols = useMemo(() => openPositions.map(p => p.symbol), [openPositions]);
@@ -122,30 +124,40 @@ export default function DimeStockPrices() {
             unrealPL       += (q.c - p.avgBuyPrice) * p.totalShares;
         });
 
-        const todayPct   = prevCloseValue > 0 ? (todayMove  / prevCloseValue) * 100 : 0;
-        const unrealPct  = costBasis      > 0 ? (unrealPL   / costBasis)      * 100 : 0;
+        const todayPct  = prevCloseValue > 0 ? (todayMove / prevCloseValue) * 100 : 0;
+        const unrealPct = costBasis      > 0 ? (unrealPL  / costBasis)      * 100 : 0;
 
         return { marketValue, todayMove, todayPct, unrealPL, unrealPct, priced, costBasis };
     }, [openPositions, prices]);
 
-    // ── Rows sorted by market value ───────────────────────────────────────────
+    // ── Rows with computed fields ─────────────────────────────────────────────
     const rows = useMemo(() => openPositions.map(p => {
-        const q = prices[p.symbol];
+        const q        = prices[p.symbol];
         const mktVal   = q ? q.c * p.totalShares : null;
         const unrealPL = q ? (q.c - p.avgBuyPrice) * p.totalShares : null;
         const unrealPct = (q && p.avgBuyPrice > 0)
             ? ((q.c - p.avgBuyPrice) / p.avgBuyPrice) * 100 : null;
-        return { ...p, q, mktVal, unrealPL, unrealPct };
-    }).sort((a, b) => (b.mktVal ?? 0) - (a.mktVal ?? 0)), [openPositions, prices]);
+        const bePct = (q && p.avgBuyPrice > 0 && unrealPL !== null && unrealPL < 0)
+            ? ((p.avgBuyPrice - q.c) / q.c) * 100 : null;
+        return { ...p, q, mktVal, unrealPL, unrealPct, bePct };
+    }), [openPositions, prices]);
+
+    // ── Sorted rows ───────────────────────────────────────────────────────────
+    const sortedRows = useMemo(() => [...rows].sort((a, b) => {
+        switch (posSort) {
+            case 'unrealPL':  return (b.unrealPL  ?? -Infinity) - (a.unrealPL  ?? -Infinity);
+            case 'unrealPct': return (b.unrealPct ?? -Infinity) - (a.unrealPct ?? -Infinity);
+            case 'todayChg':  return (b.q?.dp     ?? -Infinity) - (a.q?.dp     ?? -Infinity);
+            case 'sym':       return a.symbol.localeCompare(b.symbol);
+            default:          return (b.mktVal ?? 0) - (a.mktVal ?? 0);
+        }
+    }), [rows, posSort]);
 
     // ── Movers ────────────────────────────────────────────────────────────────
     const { gainers, losers } = useMemo(() => {
-        const withQ = rows.filter(r => r.q);
-        const byDay = [...withQ].sort((a, b) => b.q!.dp - a.q!.dp);
-        return {
-            gainers: byDay.slice(0, 3),
-            losers:  byDay.slice(-3).reverse(),
-        };
+        const withQ  = rows.filter(r => r.q);
+        const byDay  = [...withQ].sort((a, b) => b.q!.dp - a.q!.dp);
+        return { gainers: byDay.slice(0, 3), losers: byDay.slice(-3).reverse() };
     }, [rows]);
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -208,7 +220,7 @@ export default function DimeStockPrices() {
             {!isConfigured && (
                 <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg px-4 py-3">
                     <p className="text-xs font-mono text-amber-400/80">Add VITE_FINNHUB_API_KEY to .env</p>
-                    <p className="text-[9px] font-mono text-muted-foreground/40 mt-0.5">Free key at finnhub.io → 60 req/min</p>
+                    <p className="text-[9px] font-mono text-muted-foreground/40 mt-0.5">Free key at finnhub.io · 60 req/min</p>
                 </div>
             )}
 
@@ -225,7 +237,6 @@ export default function DimeStockPrices() {
                         </p>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 pt-3 border-t border-border/15">
-                            {/* Today's move */}
                             <div>
                                 <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Today's Move</p>
                                 <p className={cn('font-mono text-sm font-bold',
@@ -239,8 +250,6 @@ export default function DimeStockPrices() {
                                     {metrics.todayPct >= 0 ? '+' : ''}{metrics.todayPct.toFixed(2)}%
                                 </p>
                             </div>
-
-                            {/* Unrealized P&L */}
                             <div>
                                 <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Unrealized P&L</p>
                                 <p className={cn('font-mono text-sm font-bold',
@@ -273,9 +282,7 @@ export default function DimeStockPrices() {
                                 className="w-full flex items-center justify-between py-1.5 hover:opacity-80 transition-opacity"
                             >
                                 <span className="font-mono font-black text-[11px] text-foreground/80">{r.symbol}</span>
-                                <span className="font-mono text-[10px] font-bold text-emerald-400">
-                                    +{r.q!.dp.toFixed(2)}%
-                                </span>
+                                <span className="font-mono text-[10px] font-bold text-emerald-400">+{r.q!.dp.toFixed(2)}%</span>
                             </button>
                         ))}
                     </div>
@@ -290,27 +297,45 @@ export default function DimeStockPrices() {
                                 className="w-full flex items-center justify-between py-1.5 hover:opacity-80 transition-opacity"
                             >
                                 <span className="font-mono font-black text-[11px] text-foreground/80">{r.symbol}</span>
-                                <span className="font-mono text-[10px] font-bold text-rose-400">
-                                    {r.q!.dp.toFixed(2)}%
-                                </span>
+                                <span className="font-mono text-[10px] font-bold text-rose-400">{r.q!.dp.toFixed(2)}%</span>
                             </button>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* All open positions list */}
+            {/* Position list */}
             <div>
                 <div className="flex items-center gap-2 mb-2">
                     <div className="h-px flex-1 bg-border/20" />
-                    <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em]">
-                        Open Positions
-                    </span>
+                    <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em]">Open Positions</span>
                     <div className="h-px flex-1 bg-border/20" />
                 </div>
 
+                {/* Sort chips */}
+                <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                    <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.14em]">Sort</span>
+                    {([
+                        { key: 'mktVal',    label: 'VALUE' },
+                        { key: 'unrealPL',  label: 'UNREAL $' },
+                        { key: 'unrealPct', label: 'UNREAL %' },
+                        { key: 'todayChg',  label: 'TODAY' },
+                        { key: 'sym',       label: 'A–Z' },
+                    ] as { key: PosSort; label: string }[]).map(({ key, label }) => (
+                        <button key={key} onClick={() => setPosSort(key)}
+                            className={cn(
+                                'px-2 py-0.5 text-[8px] font-bold tracking-widest border transition-all',
+                                posSort === key
+                                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                                    : 'bg-black/20 border-border/20 text-muted-foreground/40 hover:border-border/40 hover:text-muted-foreground/60'
+                            )}>
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
                 <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
-                    {rows.map((r, i) => {
+                    {sortedRows.map((r, i) => {
                         const hasQ  = !!r.q;
                         const plPos = (r.unrealPL ?? 0) >= 0;
                         return (
@@ -319,16 +344,12 @@ export default function DimeStockPrices() {
                                 className="w-full flex items-center gap-2.5 px-3 py-3 text-left active:bg-white/[0.04] hover:bg-white/[0.02] transition-colors"
                             >
                                 {/* Rank */}
-                                <span className="text-[8px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right">
-                                    {i + 1}
-                                </span>
+                                <span className="text-[8px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right">{i + 1}</span>
 
                                 {/* Symbol + shares */}
                                 <div className="w-[58px] shrink-0">
                                     <p className="font-mono font-black text-[11px] text-foreground truncate">{r.symbol}</p>
-                                    <p className="text-[8px] font-mono text-muted-foreground/30 mt-px">
-                                        {r.totalShares.toFixed(4)} sh
-                                    </p>
+                                    <p className="text-[8px] font-mono text-muted-foreground/30 mt-px">{r.totalShares.toFixed(4)} sh</p>
                                 </div>
 
                                 {/* Price + daily % */}
@@ -336,21 +357,20 @@ export default function DimeStockPrices() {
                                     {hasQ ? (
                                         <>
                                             <div className="flex items-baseline gap-1.5">
-                                                <span className="font-mono font-bold text-xs text-foreground/90">
-                                                    ${r.q!.c.toFixed(2)}
-                                                </span>
+                                                <span className="font-mono font-bold text-xs text-foreground/90">${r.q!.c.toFixed(2)}</span>
                                                 <SignBadge v={r.q!.dp} />
                                             </div>
                                             <p className="text-[8px] font-mono text-muted-foreground/30 mt-0.5">
                                                 avg ${r.avgBuyPrice.toFixed(2)}
+                                                {r.bePct !== null && (
+                                                    <span className="ml-1.5 text-amber-400/60">↑{r.bePct.toFixed(1)}% b/e</span>
+                                                )}
                                             </p>
                                         </>
                                     ) : (
                                         <>
                                             <p className="text-[9px] font-mono text-muted-foreground/25">—</p>
-                                            <p className="text-[8px] font-mono text-muted-foreground/25 mt-0.5">
-                                                avg ${r.avgBuyPrice.toFixed(2)}
-                                            </p>
+                                            <p className="text-[8px] font-mono text-muted-foreground/25 mt-0.5">avg ${r.avgBuyPrice.toFixed(2)}</p>
                                         </>
                                     )}
                                 </div>
