@@ -45,7 +45,11 @@ interface SymbolSummary {
     totalStockAmount: number;
     totalSharesSold: number;
     realizedPL: number;
+    realizedPLPct: number;
+    allocationPct: number;
 }
+
+type PortfolioSort = 'position' | 'pl' | 'pl_pct' | 'symbol' | 'trades' | 'invested';
 
 // ─── SidePill ─────────────────────────────────────────────────────────────────
 
@@ -123,6 +127,7 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
     const hasSold = s.totalSellAmount > 0;
     const plPositive = s.realizedPL >= 0;
     const hasPosition = s.totalShares > 0;
+    const isClosed = !hasPosition && hasSold;
 
     return (
         <button
@@ -135,35 +140,50 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
             )} />
 
             <div className="p-4">
+                {/* Header row */}
                 <div className="flex items-start justify-between mb-3">
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
                             <span className="font-mono font-black text-lg text-foreground tracking-tighter">{s.symbol}</span>
                             <span className="text-[9px] text-muted-foreground/40 font-mono">{s.txCount}T</span>
+                            {isClosed && (
+                                <span className="text-[8px] px-1.5 py-0.5 font-bold tracking-widest border bg-muted/10 border-border/20 text-muted-foreground/40">
+                                    CLOSED
+                                </span>
+                            )}
                         </div>
                         <span className="text-[9px] text-muted-foreground/30 font-mono">{formatDate(s.latestDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         {hasSold && (
-                            <div className={cn('flex items-center gap-1 text-xs font-mono font-bold',
-                                plPositive ? 'text-emerald-400' : 'text-rose-400'
-                            )}>
-                                {plPositive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                                {plPositive ? '+' : ''}{fmt(s.realizedPL)}
+                            <div className="text-right">
+                                <div className={cn('flex items-center gap-1 text-xs font-mono font-bold justify-end',
+                                    plPositive ? 'text-emerald-400' : 'text-rose-400'
+                                )}>
+                                    {plPositive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                                    {plPositive ? '+' : ''}{fmt(s.realizedPL)}
+                                </div>
+                                <div className={cn('text-[9px] font-mono mt-0.5',
+                                    plPositive ? 'text-emerald-400/60' : 'text-rose-400/60'
+                                )}>
+                                    {plPositive ? '+' : ''}{s.realizedPLPct.toFixed(1)}%
+                                </div>
                             </div>
                         )}
                         <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
                     </div>
                 </div>
 
-                <div className="mb-3">
-                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">Position</p>
-                    <p className="font-mono font-black text-xl text-cyan-300 tracking-tight">{fmt(s.totalStockAmount)}</p>
-                    {s.totalShares > 0 && (
+                {/* Position size */}
+                {hasPosition && (
+                    <div className="mb-3">
+                        <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">Position</p>
+                        <p className="font-mono font-black text-xl text-cyan-300 tracking-tight">{fmt(s.totalStockAmount)}</p>
                         <p className="text-[9px] font-mono text-muted-foreground/40 mt-0.5">{s.totalShares.toFixed(6)} sh</p>
-                    )}
-                </div>
+                    </div>
+                )}
 
+                {/* Realized P&L box */}
                 <div className={cn(
                     'mb-3 border px-3 py-2 rounded-lg',
                     hasSold
@@ -174,15 +194,23 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                 )}>
                     <div className="flex items-center justify-between gap-3">
                         <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em]">Realized P&L</p>
-                        <p className={cn(
-                            'font-mono font-black text-sm',
-                            !hasSold ? 'text-muted-foreground/35' : plPositive ? 'text-emerald-400' : 'text-rose-400'
-                        )}>
-                            {hasSold && plPositive ? '+' : ''}{fmt(hasSold ? s.realizedPL : 0)}
-                        </p>
+                        <div className="text-right">
+                            <p className={cn(
+                                'font-mono font-black text-sm',
+                                !hasSold ? 'text-muted-foreground/35' : plPositive ? 'text-emerald-400' : 'text-rose-400'
+                            )}>
+                                {hasSold && plPositive ? '+' : ''}{fmt(hasSold ? s.realizedPL : 0)}
+                            </p>
+                            {hasSold && (
+                                <p className={cn('text-[9px] font-mono', plPositive ? 'text-emerald-400/50' : 'text-rose-400/50')}>
+                                    {plPositive ? '+' : ''}{s.realizedPLPct.toFixed(2)}%
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
 
+                {/* Stats row */}
                 <div className="flex items-center gap-4 pt-2.5 border-t border-border/15">
                     <div>
                         <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Avg Cost</p>
@@ -194,11 +222,27 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                             <p className="font-mono font-bold text-xs text-emerald-400/80">{fmt(s.totalSellAmount)}</p>
                         </div>
                     )}
-                    <div className="ml-auto">
+                    <div className="ml-auto text-right">
                         <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Invested</p>
                         <p className="font-mono font-bold text-xs text-foreground/60">{fmt(s.totalBuyAmount)}</p>
                     </div>
                 </div>
+
+                {/* Portfolio allocation bar */}
+                {s.allocationPct > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-border/10">
+                        <div className="flex items-center justify-between mb-1">
+                            <p className="text-[8px] text-muted-foreground/25 uppercase tracking-[0.12em]">Portfolio allocation</p>
+                            <p className="text-[9px] font-mono font-bold text-muted-foreground/40">{s.allocationPct.toFixed(1)}%</p>
+                        </div>
+                        <div className="h-0.5 bg-border/15 rounded-full overflow-hidden">
+                            <div
+                                className={cn('h-full rounded-full transition-all', hasPosition ? 'bg-cyan-500/50' : 'bg-emerald-500/30')}
+                                style={{ width: `${Math.min(100, s.allocationPct)}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </button>
     );
@@ -215,6 +259,7 @@ export default function DimeStock() {
     const [activeTab, setActiveTab] = useState('portfolio');
     const [symbolFilter, setSymbolFilter] = useState('');
     const [filterOpen, setFilterOpen] = useState(false);
+    const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('position');
 
     useEffect(() => {
         if (!filterOpen) return;
@@ -251,6 +296,8 @@ export default function DimeStock() {
             totalStockAmount: 0,
             totalSharesSold: 0,
             realizedPL: 0,
+            realizedPLPct: 0,
+            allocationPct: 0,
         });
 
         transactions.filter(t => t.side === 'BUY').forEach((tx) => {
@@ -284,8 +331,13 @@ export default function DimeStock() {
             map[sym] = summary;
         });
 
+        const totalInvested = Object.values(map).reduce((s, x) => s + x.totalBuyAmount, 0);
+
         Object.values(map).forEach((s) => {
             s.realizedPL = s.totalSellAmount > 0 ? s.totalSellAmount - (s.totalSharesSold * s.avgBuyPrice) : 0;
+            const costOfSold = s.totalSharesSold * s.avgBuyPrice;
+            s.realizedPLPct = costOfSold > 0 ? (s.realizedPL / costOfSold) * 100 : 0;
+            s.allocationPct = totalInvested > 0 ? (s.totalBuyAmount / totalInvested) * 100 : 0;
             if (s.totalShares <= 0.000001) { s.totalShares = 0; s.totalStockAmount = 0; }
             else s.totalStockAmount = Math.max(0, s.totalStockAmount);
         });
@@ -296,9 +348,19 @@ export default function DimeStock() {
         });
     }, [transactions]);
 
-    const filteredSummaries = useMemo(() =>
-        symbolFilter ? symbolSummaries.filter(s => s.symbol === symbolFilter) : symbolSummaries
-    , [symbolSummaries, symbolFilter]);
+    const filteredSummaries = useMemo(() => {
+        const base = symbolFilter ? symbolSummaries.filter(s => s.symbol === symbolFilter) : symbolSummaries;
+        return [...base].sort((a, b) => {
+            switch (portfolioSort) {
+                case 'pl':       return b.realizedPL - a.realizedPL;
+                case 'pl_pct':   return b.realizedPLPct - a.realizedPLPct;
+                case 'symbol':   return a.symbol.localeCompare(b.symbol);
+                case 'trades':   return b.txCount - a.txCount;
+                case 'invested': return b.totalBuyAmount - a.totalBuyAmount;
+                default:         return (b.totalStockAmount - a.totalStockAmount) || (b.realizedPL - a.realizedPL);
+            }
+        });
+    }, [symbolSummaries, symbolFilter, portfolioSort]);
 
     const filteredTransactions = useMemo(() =>
         symbolFilter ? transactions.filter(t => t.symbol === symbolFilter) : transactions
@@ -460,7 +522,30 @@ export default function DimeStock() {
                 </div>
 
                 {activeTab === 'portfolio' && (
-                    <div className="w-full">
+                    <div className="w-full flex flex-col gap-2">
+                        {/* Sort chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.14em] mr-0.5">Sort</span>
+                            {([
+                                { key: 'position', label: 'POSITION' },
+                                { key: 'pl',       label: 'P&L $' },
+                                { key: 'pl_pct',   label: 'P&L %' },
+                                { key: 'invested', label: 'INVESTED' },
+                                { key: 'symbol',   label: 'A–Z' },
+                                { key: 'trades',   label: 'TRADES' },
+                            ] as { key: PortfolioSort; label: string }[]).map(({ key, label }) => (
+                                <button key={key} onClick={() => setPortfolioSort(key)}
+                                    className={cn(
+                                        'px-2 py-1 text-[8px] font-bold tracking-widest border transition-all',
+                                        portfolioSort === key
+                                            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                                            : 'bg-black/20 border-border/20 text-muted-foreground/40 hover:border-border/40 hover:text-muted-foreground/60'
+                                    )}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
                         {filteredSummaries.length === 0 ? (
                             <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground/30 border border-dashed border-border/20 rounded-xl">
                                 <Inbox className="size-8 opacity-30" />
