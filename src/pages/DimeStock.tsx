@@ -248,82 +248,116 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
     );
 }
 
-// ─── Portfolio Heatmap ───────────────────────────────────────────────────────
+// ─── Portfolio Map (mobile-first list + allocation strip) ────────────────────
+
+function fmtCompact(v: number): string {
+    const abs = Math.abs(v);
+    const sign = v >= 0 ? '+' : '-';
+    if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}k`;
+    return `${sign}$${abs.toFixed(0)}`;
+}
 
 function PortfolioMap({ summaries, onSymbolClick }: {
     summaries: SymbolSummary[];
     onSymbolClick: (sym: string) => void;
 }) {
     const sorted = [...summaries].sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
-    const total = sorted.reduce((s, x) => s + x.totalBuyAmount, 0);
-    if (total === 0) return null;
+    if (sorted.length === 0) return null;
+
+    const maxAlloc = sorted[0].allocationPct;
 
     return (
         <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-px bg-black/30 border border-border/20 overflow-hidden">
+
+            {/* Allocation strip — visual overview of the whole portfolio */}
+            <div className="h-3 flex rounded-sm overflow-hidden bg-black/30 gap-px">
                 {sorted.map(s => {
-                    const weight = (s.totalBuyAmount / total) * 100;
                     const hasSells = s.totalSellAmount > 0;
                     const plPos = s.realizedPL >= 0;
                     const hasPos = s.totalShares > 0;
-                    const isSmall = weight < 5;
-                    const isTiny = weight < 2.5;
+                    const fill = hasSells
+                        ? plPos ? 'bg-emerald-500/80' : 'bg-rose-500/80'
+                        : hasPos ? 'bg-cyan-500/60' : 'bg-border/30';
+                    return (
+                        <button key={s.symbol}
+                            onClick={() => onSymbolClick(s.symbol)}
+                            title={`${s.symbol} ${s.allocationPct.toFixed(1)}%`}
+                            className={cn('h-full shrink-0 hover:brightness-125 transition-all', fill)}
+                            style={{ width: `${s.allocationPct}%` }}
+                        />
+                    );
+                })}
+            </div>
 
-                    const bg = hasSells
-                        ? plPos
-                            ? 'bg-emerald-500/[0.18] hover:bg-emerald-500/[0.26] border-emerald-500/20'
-                            : 'bg-rose-500/[0.18] hover:bg-rose-500/[0.26] border-rose-500/20'
-                        : hasPos
-                            ? 'bg-cyan-500/[0.12] hover:bg-cyan-500/[0.20] border-cyan-500/15'
-                            : 'bg-white/[0.04] hover:bg-white/[0.07] border-border/15';
+            {/* Sorted list */}
+            <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
+                {sorted.map((s, i) => {
+                    const hasSells = s.totalSellAmount > 0;
+                    const plPos = s.realizedPL >= 0;
+                    const hasPos = s.totalShares > 0;
+                    const barW = `${(s.allocationPct / maxAlloc) * 100}%`;
+
+                    const barBg = hasSells
+                        ? plPos ? 'bg-emerald-500/20' : 'bg-rose-500/20'
+                        : hasPos ? 'bg-cyan-500/12' : 'bg-border/10';
+
+                    const plColor = hasSells
+                        ? plPos ? 'text-emerald-400' : 'text-rose-400'
+                        : 'text-muted-foreground/30';
 
                     return (
-                        <button
-                            key={s.symbol}
+                        <button key={s.symbol}
                             onClick={() => onSymbolClick(s.symbol)}
-                            title={`${s.symbol} · ${s.allocationPct.toFixed(1)}% of portfolio${hasSells ? ` · ${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}% P&L` : ' · no sells'}`}
-                            className={cn('relative flex flex-col justify-between p-1.5 overflow-hidden transition-colors border-r border-b last:border-r-0', bg)}
-                            style={{
-                                flexBasis: `${Math.max(weight, 3)}%`,
-                                flexGrow: weight,
-                                minHeight: isTiny ? '38px' : isSmall ? '52px' : '70px',
-                            }}
-                        >
-                            <span className={cn('font-mono font-black leading-none truncate text-foreground/90', isSmall ? 'text-[8px]' : 'text-[10px]')}>
-                                {s.symbol}
-                            </span>
-                            {!isTiny && (
-                                <div className="mt-auto pt-1">
-                                    {hasSells && (
-                                        <span className={cn('block font-mono font-bold leading-none', isSmall ? 'text-[7px]' : 'text-[9px]', plPos ? 'text-emerald-400' : 'text-rose-400')}>
-                                            {plPos ? '+' : ''}{s.realizedPLPct.toFixed(1)}%
-                                        </span>
-                                    )}
-                                    {!isSmall && (
-                                        <span className="block font-mono text-[7px] text-muted-foreground/35 mt-0.5">
-                                            {s.allocationPct.toFixed(0)}% alloc
-                                        </span>
-                                    )}
+                            className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:bg-white/[0.04] hover:bg-white/[0.02] transition-colors">
+
+                            {/* Rank */}
+                            <span className="text-[8px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right leading-none">{i + 1}</span>
+
+                            {/* Symbol */}
+                            <span className="font-mono font-black text-[11px] text-foreground w-[52px] shrink-0 truncate leading-none">{s.symbol}</span>
+
+                            {/* Bar track */}
+                            <div className="flex-1 relative h-[22px] bg-black/20 overflow-hidden">
+                                <div className={cn('absolute inset-y-0 left-0', barBg)}
+                                    style={{ width: barW }} />
+                                <div className="absolute inset-0 flex items-center px-1.5">
+                                    <span className={cn('text-[9px] font-mono font-bold leading-none', plColor)}>
+                                        {hasSells
+                                            ? `${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}%`
+                                            : hasPos ? 'holding' : 'closed'}
+                                    </span>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Right: P&L $ + alloc% */}
+                            <div className="shrink-0 text-right w-16">
+                                {hasSells && (
+                                    <span className={cn('font-mono font-bold text-[10px] block leading-snug', plColor)}>
+                                        {fmtCompact(s.realizedPL)}
+                                    </span>
+                                )}
+                                <span className="text-[8px] font-mono text-muted-foreground/30 block leading-snug">
+                                    {s.allocationPct.toFixed(1)}%
+                                </span>
+                            </div>
                         </button>
                     );
                 })}
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-3 flex-wrap px-0.5">
+            <div className="flex items-center gap-3 flex-wrap">
                 {[
                     { color: 'bg-emerald-500/60', label: 'Profit' },
                     { color: 'bg-rose-500/60',    label: 'Loss' },
-                    { color: 'bg-cyan-500/40',    label: 'Holding (no sells)' },
+                    { color: 'bg-cyan-500/40',    label: 'Holding' },
                 ].map(({ color, label }) => (
                     <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
                         <span className={cn('size-2 rounded-sm shrink-0', color)} />
                         {label}
                     </span>
                 ))}
-                <span className="text-[8px] font-mono text-muted-foreground/25 ml-auto">Size = investment</span>
+                <span className="text-[8px] font-mono text-muted-foreground/25 ml-auto">bar width = % of portfolio</span>
             </div>
         </div>
     );
