@@ -6,6 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn, getErrorMessage } from '@/lib/utils';
 import { ChevronLeft, TrendingUp, TrendingDown, Activity, Trash2 } from 'lucide-react';
 import {
+    ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RCTip,
+    ResponsiveContainer, ReferenceLine,
+} from 'recharts';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -122,6 +126,25 @@ export default function SymbolDetailPage() {
         : 0;
     const plPositive = realized >= 0;
 
+    const chartData = useMemo(() => {
+        let cumPL = 0;
+        return [...symTxs]
+            .sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+            .map(tx => {
+                const isBuy = tx.side === 'BUY';
+                const buyAmt = isBuy ? Number(tx.gross_usd ?? 0) + Number(tx.fee_usd ?? 0) : null;
+                const sellNet = !isBuy ? Number(tx.net_usd ?? 0) : null;
+                if (!isBuy) cumPL += Number(tx.net_usd ?? 0) - Number(tx.qty) * summary.avgBuyPrice;
+                return {
+                    label: new Date(tx.trade_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+                    side: tx.side,
+                    buy: buyAmt,
+                    sell: sellNet,
+                    pl: cumPL,
+                };
+            });
+    }, [symTxs, summary.avgBuyPrice]);
+
     const handleDelete = async (id: number) => {
         try {
             const { error } = await supabase.from('dime_trades').delete().eq('id', id);
@@ -213,6 +236,53 @@ export default function SymbolDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Trade chart */}
+            {chartData.length > 1 && (
+                <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] p-3">
+                    <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.16em] mb-3">Trade History</p>
+                    <ResponsiveContainer width="100%" height={160}>
+                        <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                            <XAxis dataKey="label"
+                                tick={{ fontSize: 8, fill: '#475569', fontFamily: 'JetBrains Mono, monospace' }}
+                                interval="preserveStartEnd" />
+                            <YAxis
+                                tick={{ fontSize: 8, fill: '#475569', fontFamily: 'JetBrains Mono, monospace' }}
+                                tickFormatter={v => `$${Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + 'k' : v.toFixed(0)}`} />
+                            <RCTip content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                    <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+                                        <p className="text-muted-foreground/60 mb-1">{label}</p>
+                                        {payload.map((p: any, i: number) => p.value != null && (
+                                            <p key={i} style={{ color: p.color ?? p.fill }}>
+                                                {p.name}: ${Number(p.value).toFixed(2)}
+                                            </p>
+                                        ))}
+                                    </div>
+                                );
+                            }} />
+                            <ReferenceLine y={0} stroke="#334155" />
+                            <Bar dataKey="buy" name="Buy" fill="#22d3ee" opacity={0.75} radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="sell" name="Sell" fill="#34d399" opacity={0.75} radius={[2, 2, 0, 0]} />
+                            <Line type="monotone" dataKey="pl" name="Cum. P&L"
+                                stroke="#fbbf24" strokeWidth={1.5} dot={false} connectNulls />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                    <div className="flex items-center gap-3 mt-1.5">
+                        {[
+                            { color: '#22d3ee', label: 'Buy' },
+                            { color: '#34d399', label: 'Sell' },
+                            { color: '#fbbf24', label: 'Cumul. P&L' },
+                        ].map(({ color, label }) => (
+                            <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
+                                <span className="size-2 rounded-sm shrink-0" style={{ background: color }} />
+                                {label}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="flex items-center gap-2 px-1">
                 <div className="h-px flex-1 bg-border/20" />

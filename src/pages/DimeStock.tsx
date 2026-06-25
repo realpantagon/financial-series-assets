@@ -18,7 +18,7 @@ import { cn, getErrorMessage } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Trash2, Inbox, Activity, Check, Filter
+    Trash2, Inbox, Activity, Check, Filter, BarChart2, CalendarDays
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
 
@@ -248,6 +248,87 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
     );
 }
 
+// ─── Portfolio Heatmap ───────────────────────────────────────────────────────
+
+function PortfolioMap({ summaries, onSymbolClick }: {
+    summaries: SymbolSummary[];
+    onSymbolClick: (sym: string) => void;
+}) {
+    const sorted = [...summaries].sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
+    const total = sorted.reduce((s, x) => s + x.totalBuyAmount, 0);
+    if (total === 0) return null;
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-px bg-black/30 border border-border/20 overflow-hidden">
+                {sorted.map(s => {
+                    const weight = (s.totalBuyAmount / total) * 100;
+                    const hasSells = s.totalSellAmount > 0;
+                    const plPos = s.realizedPL >= 0;
+                    const hasPos = s.totalShares > 0;
+                    const isSmall = weight < 5;
+                    const isTiny = weight < 2.5;
+
+                    const bg = hasSells
+                        ? plPos
+                            ? 'bg-emerald-500/[0.18] hover:bg-emerald-500/[0.26] border-emerald-500/20'
+                            : 'bg-rose-500/[0.18] hover:bg-rose-500/[0.26] border-rose-500/20'
+                        : hasPos
+                            ? 'bg-cyan-500/[0.12] hover:bg-cyan-500/[0.20] border-cyan-500/15'
+                            : 'bg-white/[0.04] hover:bg-white/[0.07] border-border/15';
+
+                    return (
+                        <button
+                            key={s.symbol}
+                            onClick={() => onSymbolClick(s.symbol)}
+                            title={`${s.symbol} · ${s.allocationPct.toFixed(1)}% of portfolio${hasSells ? ` · ${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}% P&L` : ' · no sells'}`}
+                            className={cn('relative flex flex-col justify-between p-1.5 overflow-hidden transition-colors border-r border-b last:border-r-0', bg)}
+                            style={{
+                                flexBasis: `${Math.max(weight, 3)}%`,
+                                flexGrow: weight,
+                                minHeight: isTiny ? '38px' : isSmall ? '52px' : '70px',
+                            }}
+                        >
+                            <span className={cn('font-mono font-black leading-none truncate text-foreground/90', isSmall ? 'text-[8px]' : 'text-[10px]')}>
+                                {s.symbol}
+                            </span>
+                            {!isTiny && (
+                                <div className="mt-auto pt-1">
+                                    {hasSells && (
+                                        <span className={cn('block font-mono font-bold leading-none', isSmall ? 'text-[7px]' : 'text-[9px]', plPos ? 'text-emerald-400' : 'text-rose-400')}>
+                                            {plPos ? '+' : ''}{s.realizedPLPct.toFixed(1)}%
+                                        </span>
+                                    )}
+                                    {!isSmall && (
+                                        <span className="block font-mono text-[7px] text-muted-foreground/35 mt-0.5">
+                                            {s.allocationPct.toFixed(0)}% alloc
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-3 flex-wrap px-0.5">
+                {[
+                    { color: 'bg-emerald-500/60', label: 'Profit' },
+                    { color: 'bg-rose-500/60',    label: 'Loss' },
+                    { color: 'bg-cyan-500/40',    label: 'Holding (no sells)' },
+                ].map(({ color, label }) => (
+                    <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
+                        <span className={cn('size-2 rounded-sm shrink-0', color)} />
+                        {label}
+                    </span>
+                ))}
+                <span className="text-[8px] font-mono text-muted-foreground/25 ml-auto">Size = investment</span>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DimeStock() {
@@ -260,6 +341,7 @@ export default function DimeStock() {
     const [symbolFilter, setSymbolFilter] = useState('');
     const [filterOpen, setFilterOpen] = useState(false);
     const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('position');
+    const [showMap, setShowMap] = useState(false);
 
     useEffect(() => {
         if (!filterOpen) return;
@@ -419,13 +501,22 @@ export default function DimeStock() {
                         {transactions.length} tx · {symbolSummaries.length} sym
                     </span>
                 </div>
-                <button
-                    onClick={() => navigate('/dime-stock-add')}
-                    className="flex items-center justify-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/25 hover:border-cyan-400/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
-                >
-                    <Plus className="size-3.5" />
-                    ADD
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => navigate('/dime-stock/yearly')}
+                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
+                    >
+                        <CalendarDays className="size-3.5" />
+                        YEARLY
+                    </button>
+                    <button
+                        onClick={() => navigate('/dime-stock-add')}
+                        className="flex items-center justify-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/25 hover:border-cyan-400/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
+                    >
+                        <Plus className="size-3.5" />
+                        ADD
+                    </button>
+                </div>
             </div>
 
             {/* ── Portfolio Hero ── */}
@@ -460,6 +551,27 @@ export default function DimeStock() {
                     </p>
                 </div>
             </div>
+
+            {/* ── Portfolio Map toggle ── */}
+            <button
+                onClick={() => setShowMap(v => !v)}
+                className="w-full flex items-center gap-2 py-0.5 group"
+            >
+                <div className="flex-1 h-px bg-border/15" />
+                <span className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em] group-hover:text-muted-foreground/60 transition-colors whitespace-nowrap">
+                    <BarChart2 className="size-3" />
+                    PORTFOLIO MAP
+                    <ChevronDown className={cn('size-3 transition-transform', showMap && 'rotate-180')} />
+                </span>
+                <div className="flex-1 h-px bg-border/15" />
+            </button>
+
+            {showMap && (
+                <PortfolioMap
+                    summaries={symbolSummaries}
+                    onSymbolClick={(sym) => navigate(`/dime-stock/${sym}`)}
+                />
+            )}
 
             {/* ── Filter & Tabs ── */}
             <div className="flex flex-col gap-3">
