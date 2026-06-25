@@ -3,22 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, getErrorMessage } from '@/lib/utils';
-import { ChevronLeft, TrendingUp, TrendingDown, Activity, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ChevronLeft, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RCTip,
     ResponsiveContainer, ReferenceLine,
 } from 'recharts';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -70,8 +60,6 @@ export default function SymbolDetailPage() {
     const navigate = useNavigate();
     const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
-
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
@@ -144,16 +132,6 @@ export default function SymbolDetailPage() {
                 };
             });
     }, [symTxs, summary.avgBuyPrice]);
-
-    const handleDelete = async (id: number) => {
-        try {
-            const { error } = await supabase.from('dime_trades').delete().eq('id', id);
-            if (error) throw error;
-            toast.success('Transaction deleted');
-            setDeleteId(null);
-            await fetchTransactions();
-        } catch (err) { toast.error('Delete failed', { description: getErrorMessage(err) }); }
-    };
 
     if (loading) return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
@@ -313,19 +291,11 @@ export default function SymbolDetailPage() {
                                             <SidePill side={tx.side} />
                                             <span className="text-[10px] text-muted-foreground/60 font-mono">{formatDate(tx.trade_date)}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className={cn('font-mono font-bold text-sm',
-                                                isBuy ? 'text-foreground' : 'text-emerald-400'
-                                            )}>
-                                                {fmt(displayAmount)}
-                                            </span>
-                                            <button
-                                                onClick={() => setDeleteId(tx.id)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/10 text-muted-foreground/40 hover:text-rose-400 transition-all"
-                                            >
-                                                <Trash2 className="size-3" />
-                                            </button>
-                                        </div>
+                                        <span className={cn('font-mono font-bold text-sm',
+                                            isBuy ? 'text-foreground' : 'text-emerald-400'
+                                        )}>
+                                            {fmt(displayAmount)}
+                                        </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1 text-[9px] font-mono text-muted-foreground/50">
                                         <span>{Number(tx.qty).toFixed(7)} sh</span>
@@ -343,23 +313,6 @@ export default function SymbolDetailPage() {
                 </div>
             </div>
 
-            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent className="bg-[oklch(0.12_0.018_255)] border-border/40">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="font-mono text-sm tracking-wide">Delete transaction?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs">This cannot be undone.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel className="border-border/30 text-xs h-9">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-rose-500/70 hover:bg-rose-500 text-white border-rose-500/20 text-xs h-9"
-                            onClick={() => deleteId !== null && handleDelete(deleteId)}
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }

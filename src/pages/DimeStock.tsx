@@ -4,21 +4,10 @@ import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { cn, getErrorMessage } from '@/lib/utils';
-import { toast } from 'sonner';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Trash2, Inbox, Activity, Check, Filter, BarChart2, CalendarDays
+    Inbox, Activity, Check, Filter, BarChart2, CalendarDays
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
 
@@ -76,14 +65,14 @@ function FeePill({ label, value }: { label: string; value: number | null | undef
 
 // ─── Trade row ────────────────────────────────────────────────────────────────
 
-function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: number) => void }) {
+function TradeRow({ tx }: { tx: DimeTransaction }) {
     const isBuy = tx.side === 'BUY';
     const displayAmount = isBuy
         ? (tx.gross_usd ?? 0) + (tx.fee_usd ?? 0)
         : (tx.net_usd ?? 0);
 
     return (
-        <div className="group flex items-start gap-2.5 px-3 py-2.5 border-b border-border/20 last:border-0 hover:bg-white/1 transition-colors">
+        <div className="flex items-start gap-2.5 px-3 py-2.5 border-b border-border/20 last:border-0">
             <div className={cn('w-0.5 self-stretch rounded-full shrink-0 mt-0.5',
                 isBuy ? 'bg-cyan-500' : 'bg-emerald-500'
             )} />
@@ -95,19 +84,11 @@ function TradeRow({ tx, onDelete }: { tx: DimeTransaction; onDelete: (id: number
                         <SidePill side={tx.side} />
                         <span className="text-[9px] text-muted-foreground/50 font-mono">{formatDate(tx.trade_date)}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={cn('font-mono font-bold text-sm',
-                            isBuy ? 'text-foreground' : 'text-emerald-400'
-                        )}>
-                            {fmt(displayAmount)}
-                        </span>
-                        <button
-                            onClick={() => onDelete(tx.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/10 text-muted-foreground/30 hover:text-rose-400 transition-all"
-                        >
-                            <Trash2 className="size-3" />
-                        </button>
-                    </div>
+                    <span className={cn('font-mono font-bold text-sm shrink-0',
+                        isBuy ? 'text-foreground' : 'text-emerald-400'
+                    )}>
+                        {fmt(displayAmount)}
+                    </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                     <span className="text-[9px] font-mono text-muted-foreground/50">
@@ -370,7 +351,6 @@ export default function DimeStock() {
     const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState('portfolio');
     const [symbolFilter, setSymbolFilter] = useState('');
     const [filterOpen, setFilterOpen] = useState(false);
@@ -503,15 +483,6 @@ export default function DimeStock() {
     const plSymbols = useMemo(() =>
         symbolSummaries.filter(s => s.totalSellAmount > 0).length
     , [symbolSummaries]);
-
-    const handleDelete = async (id: number) => {
-        try {
-            const { error } = await supabase.from('dime_trades').delete().eq('id', id);
-            if (error) throw error;
-            setDeleteId(null);
-            await fetchTransactions();
-        } catch (err) { toast.error('Delete failed', { description: getErrorMessage(err) }); }
-    };
 
     if (loading) return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
@@ -727,7 +698,7 @@ export default function DimeStock() {
                                         const d = b.trade_date.localeCompare(a.trade_date);
                                         return d !== 0 ? d : (b.created_at ?? '').localeCompare(a.created_at ?? '');
                                     })
-                                    .map(tx => <TradeRow key={tx.id} tx={tx} onDelete={(id) => setDeleteId(id)} />)
+                                    .map(tx => <TradeRow key={tx.id} tx={tx} />)
                                 }
                             </div>
                         )}
@@ -735,23 +706,6 @@ export default function DimeStock() {
                 )}
             </div>
 
-            <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-                <AlertDialogContent className="bg-[oklch(0.12_0.018_255)] border-border/40">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="font-mono text-sm tracking-wide">Delete transaction?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs">This cannot be undone.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel className="border-border/30 text-xs h-9">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-rose-500/70 hover:bg-rose-500 text-white border-rose-500/20 text-xs h-9"
-                            onClick={() => deleteId !== null && handleDelete(deleteId)}
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
