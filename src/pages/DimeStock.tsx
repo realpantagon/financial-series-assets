@@ -7,11 +7,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Inbox, Activity, Check, Filter, BarChart2, CalendarDays, RefreshCw, Zap
+    Inbox, Activity, Check, Filter, BarChart2, CalendarDays
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
-import { useDailyPrices } from '@/hooks/useDailyPrices';
-import type { PriceQuote, PriceMap } from '@/lib/dailyPrices';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -106,14 +104,11 @@ function TradeRow({ tx }: { tx: DimeTransaction }) {
 
 // ─── Position Card ────────────────────────────────────────────────────────────
 
-function PositionCard({ s, onClick, price }: { s: SymbolSummary; onClick: () => void; price?: PriceQuote }) {
+function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void }) {
     const hasSold = s.totalSellAmount > 0;
     const plPositive = s.realizedPL >= 0;
     const hasPosition = s.totalShares > 0;
     const isClosed = !hasPosition && hasSold;
-
-    const unrealPL  = price && hasPosition ? (price.c - s.avgBuyPrice) * s.totalShares : null;
-    const unrealPct = price && s.avgBuyPrice > 0 ? ((price.c - s.avgBuyPrice) / s.avgBuyPrice) * 100 : null;
 
     return (
         <button
@@ -159,50 +154,6 @@ function PositionCard({ s, onClick, price }: { s: SymbolSummary; onClick: () => 
                         <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
                     </div>
                 </div>
-
-                {/* Live price + unrealized P&L */}
-                {price && (
-                    <div className="mb-3 border border-border/20 bg-black/20 rounded-lg px-3 py-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em]">Price</span>
-                                <span className={cn(
-                                    'text-[8px] font-mono font-bold px-1 py-px rounded',
-                                    price.dp >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
-                                )}>
-                                    {price.dp >= 0 ? '+' : ''}{price.dp.toFixed(2)}%
-                                </span>
-                            </div>
-                            <span className="font-mono font-bold text-sm text-foreground/90">${price.c.toFixed(2)}</span>
-                        </div>
-                        {unrealPL !== null && unrealPct !== null && (
-                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/10">
-                                <span className="text-[8px] text-muted-foreground/30 uppercase tracking-wider">Unrealized</span>
-                                <div className="text-right">
-                                    <span className={cn('font-mono font-bold text-xs',
-                                        unrealPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                                    )}>
-                                        {unrealPL >= 0 ? '+' : ''}{fmt(unrealPL)}
-                                    </span>
-                                    <span className={cn('text-[9px] font-mono ml-1',
-                                        unrealPL >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60'
-                                    )}>
-                                        ({unrealPct >= 0 ? '+' : ''}{unrealPct.toFixed(2)}%)
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                        {/* Break-even hint for losing positions */}
-                        {hasPosition && unrealPL !== null && unrealPL < 0 && price.c > 0 && (
-                            <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-amber-500/10">
-                                <span className="text-[8px] text-amber-400/50 uppercase tracking-wider">Break-even</span>
-                                <span className="text-[8px] font-mono text-amber-400/70">
-                                    ↑ {((s.avgBuyPrice - price.c) / price.c * 100).toFixed(1)}% · ${s.avgBuyPrice.toFixed(2)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* Position size */}
                 {hasPosition && (
@@ -287,44 +238,16 @@ function fmtCompact(v: number): string {
     return `${sign}$${abs.toFixed(0)}`;
 }
 
-function PortfolioMap({ summaries, onSymbolClick, prices }: {
+function PortfolioMap({ summaries, onSymbolClick }: {
     summaries: SymbolSummary[];
     onSymbolClick: (sym: string) => void;
-    prices: PriceMap;
 }) {
-    const [mapView, setMapView] = useState<'cost' | 'value'>('cost');
-
     if (summaries.length === 0) return null;
 
-    // Sort by relevant metric
-    const sorted = [...summaries].sort((a, b) => {
-        if (mapView === 'value') {
-            const qA = prices[a.symbol];
-            const qB = prices[b.symbol];
-            const mA = qA && a.totalShares > 0 ? qA.c * a.totalShares : a.totalBuyAmount;
-            const mB = qB && b.totalShares > 0 ? qB.c * b.totalShares : b.totalBuyAmount;
-            return mB - mA;
-        }
-        return b.totalBuyAmount - a.totalBuyAmount;
-    });
+    // Sort by invested (cost basis)
+    const sorted = [...summaries].sort((a, b) => b.totalBuyAmount - a.totalBuyAmount);
 
-    // Compute denominator for allocation %
-    const totalForView = sorted.reduce((sum, s) => {
-        if (mapView === 'value') {
-            const q = prices[s.symbol];
-            return sum + (q && s.totalShares > 0 ? q.c * s.totalShares : s.totalBuyAmount);
-        }
-        return sum + s.totalBuyAmount;
-    }, 0);
-
-    const getAlloc = (s: SymbolSummary): number => {
-        if (mapView === 'value') {
-            const q = prices[s.symbol];
-            const val = q && s.totalShares > 0 ? q.c * s.totalShares : s.totalBuyAmount;
-            return totalForView > 0 ? (val / totalForView) * 100 : 0;
-        }
-        return s.allocationPct;
-    };
+    const getAlloc = (s: SymbolSummary): number => s.allocationPct;
 
     const maxAlloc = Math.max(...sorted.map(getAlloc), 1);
 
@@ -356,19 +279,13 @@ function PortfolioMap({ summaries, onSymbolClick, prices }: {
                 {sorted.map((s, i) => {
                     const hasSells = s.totalSellAmount > 0;
                     const hasPos = s.totalShares > 0;
-                    const q = prices[s.symbol];
                     const allocPct = getAlloc(s);
                     const barW = `${(allocPct / maxAlloc) * 100}%`;
 
-                    // In value mode: show unrealized %; otherwise: realized %
+                    // Show realized % when sold, else holding/closed status
                     let barText = '';
                     let plColor = 'text-muted-foreground/30';
-                    if (mapView === 'value' && q && hasPos) {
-                        const unrealPct = s.avgBuyPrice > 0 ? ((q.c - s.avgBuyPrice) / s.avgBuyPrice) * 100 : 0;
-                        const pos = unrealPct >= 0;
-                        barText = `${pos ? '+' : ''}${unrealPct.toFixed(1)}% unreal`;
-                        plColor = pos ? 'text-emerald-400' : 'text-rose-400';
-                    } else if (hasSells) {
+                    if (hasSells) {
                         const plPos = s.realizedPL >= 0;
                         barText = `${plPos ? '+' : ''}${s.realizedPLPct.toFixed(1)}%`;
                         plColor = plPos ? 'text-emerald-400' : 'text-rose-400';
@@ -412,34 +329,18 @@ function PortfolioMap({ summaries, onSymbolClick, prices }: {
                 })}
             </div>
 
-            {/* Legend + view toggle */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-3">
-                    {[
-                        { color: 'bg-emerald-500/60', label: 'Profit' },
-                        { color: 'bg-rose-500/60',    label: 'Loss' },
-                        { color: 'bg-cyan-500/40',    label: 'Holding' },
-                    ].map(({ color, label }) => (
-                        <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
-                            <span className={cn('size-2 rounded-sm shrink-0', color)} />
-                            {label}
-                        </span>
-                    ))}
-                </div>
-                <div className="flex items-center gap-px text-[7px] font-mono font-bold">
-                    <button onClick={() => setMapView('cost')}
-                        className={cn('px-1.5 py-0.5 border transition-all',
-                            mapView === 'cost'
-                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
-                                : 'bg-black/20 border-border/20 text-muted-foreground/30 hover:text-muted-foreground/60'
-                        )}>COST</button>
-                    <button onClick={() => setMapView('value')}
-                        className={cn('px-1.5 py-0.5 border border-l-0 transition-all',
-                            mapView === 'value'
-                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
-                                : 'bg-black/20 border-border/20 text-muted-foreground/30 hover:text-muted-foreground/60'
-                        )}>VALUE</button>
-                </div>
+            {/* Legend */}
+            <div className="flex items-center gap-3 flex-wrap">
+                {[
+                    { color: 'bg-emerald-500/60', label: 'Profit' },
+                    { color: 'bg-rose-500/60',    label: 'Loss' },
+                    { color: 'bg-cyan-500/40',    label: 'Holding' },
+                ].map(({ color, label }) => (
+                    <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
+                        <span className={cn('size-2 rounded-sm shrink-0', color)} />
+                        {label}
+                    </span>
+                ))}
             </div>
         </div>
     );
@@ -546,13 +447,6 @@ export default function DimeStock() {
         });
     }, [transactions]);
 
-    // ── Daily price feed ──────────────────────────────────────────────────────
-    const openSymbols = useMemo(() =>
-        symbolSummaries.filter(s => s.totalShares > 0).map(s => s.symbol)
-    , [symbolSummaries]);
-
-    const { prices, loading: priceLoading, progress: priceProgress, refresh: refreshPrices, isConfigured: priceConfigured } = useDailyPrices(openSymbols);
-
     const filteredSummaries = useMemo(() => {
         const base = symbolFilter ? symbolSummaries.filter(s => s.symbol === symbolFilter) : symbolSummaries;
         return [...base].sort((a, b) => {
@@ -616,23 +510,6 @@ export default function DimeStock() {
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {priceConfigured && (
-                        <button
-                            onClick={refreshPrices}
-                            disabled={priceLoading}
-                            title={priceLoading ? `Fetching prices… ${priceProgress}%` : 'Refresh prices'}
-                            className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 w-9 h-9 rounded-none transition-all disabled:opacity-40"
-                        >
-                            <RefreshCw className={cn('size-3.5', priceLoading && 'animate-spin')} />
-                        </button>
-                    )}
-                    <button
-                        onClick={() => navigate('/dime-stock/prices')}
-                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
-                    >
-                        <Zap className="size-3.5" />
-                        LIVE
-                    </button>
                     <button
                         onClick={() => navigate('/dime-stock/yearly')}
                         className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
@@ -683,29 +560,6 @@ export default function DimeStock() {
                 </div>
             </div>
 
-            {/* ── Price fetch status ── */}
-            {priceConfigured && priceLoading && (
-                <div className="flex items-center gap-2 px-1">
-                    <div className="flex-1 h-0.5 bg-border/10 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-cyan-500/50 transition-all duration-300"
-                            style={{ width: `${priceProgress}%` }}
-                        />
-                    </div>
-                    <span className="text-[8px] font-mono text-muted-foreground/35 tracking-wider whitespace-nowrap">
-                        PRICES {priceProgress}%
-                    </span>
-                </div>
-            )}
-            {priceConfigured && !priceLoading && Object.keys(prices).length > 0 && (
-                <div className="flex items-center gap-1 px-1">
-                    <span className="size-1.5 rounded-full bg-emerald-400/60 shrink-0" />
-                    <span className="text-[8px] font-mono text-muted-foreground/30 tracking-wider">
-                        {Object.keys(prices).length} prices · today
-                    </span>
-                </div>
-            )}
-
             {/* ── Portfolio Map toggle ── */}
             <button
                 onClick={() => setShowMap(v => !v)}
@@ -724,7 +578,6 @@ export default function DimeStock() {
                 <PortfolioMap
                     summaries={symbolSummaries}
                     onSymbolClick={(sym) => navigate(`/dime-stock/${sym}`)}
-                    prices={prices}
                 />
             )}
 
@@ -825,7 +678,6 @@ export default function DimeStock() {
                                         key={s.symbol}
                                         s={s}
                                         onClick={() => navigate(`/dime-stock/${s.symbol}`)}
-                                        price={prices[s.symbol]}
                                     />
                                 ))}
                             </div>

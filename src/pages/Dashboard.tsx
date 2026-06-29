@@ -6,13 +6,20 @@ import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAccounts, getAccountIcon } from '@/lib/accounts';
-import { ChevronRight, Wallet, Banknote } from 'lucide-react';
+import { ChevronRight, Wallet, Banknote, Eye, EyeOff } from 'lucide-react';
+import { PinDialog } from '@/components/PinDialog';
+
+// Code required to reveal balances on the home screen.
+const BALANCE_PIN = '2460';
 
 export default function Dashboard() {
     const navigate = useNavigate();
     const { accounts: catalog } = useAccounts();
     const [assets, setAssets] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
+    // Balances start hidden on every visit; revealing requires the PIN.
+    const [revealed, setRevealed] = useState(false);
+    const [pinOpen, setPinOpen] = useState(false);
 
     const fetchAssets = useCallback(async () => {
         setLoading(true);
@@ -55,6 +62,15 @@ export default function Dashboard() {
     const formatCurrency = (value: number) =>
         value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });
 
+    // Mask amounts until the PIN is entered.
+    const showAmount = (value: number) => (revealed ? formatCurrency(value) : '••••••');
+
+    // Eye toggle: hide instantly, but require the PIN to reveal.
+    const toggleReveal = () => {
+        if (revealed) setRevealed(false);
+        else setPinOpen(true);
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col gap-3 pt-4 pb-20">
@@ -71,11 +87,23 @@ export default function Dashboard() {
             {/* Net Worth Hero */}
             <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
                 <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
-                <p className="text-[8px] uppercase tracking-[0.16em] text-muted-foreground/40 font-bold mb-1 relative">
-                    Total Net Worth
-                </p>
+                <div className="flex items-center justify-between mb-1 relative">
+                    <p className="text-[8px] uppercase tracking-[0.16em] text-muted-foreground/40 font-bold">
+                        Total Net Worth
+                    </p>
+                    <button
+                        onClick={toggleReveal}
+                        className="flex items-center justify-center size-7 -mr-1.5 -mt-1.5 rounded-md text-muted-foreground/50 hover:text-cyan-400 transition-colors"
+                        aria-label={revealed ? 'Hide balances' : 'Show balances'}
+                    >
+                        {revealed
+                            ? <EyeOff className="size-4" strokeWidth={2} />
+                            : <Eye className="size-4" strokeWidth={2} />
+                        }
+                    </button>
+                </div>
                 <div className="font-mono font-black text-4xl text-foreground tracking-tight relative leading-none">
-                    {formatCurrency(totalAssetValue)}
+                    {showAmount(totalAssetValue)}
                 </div>
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/15 relative">
                     <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">{accounts.length} accounts</span>
@@ -142,7 +170,7 @@ export default function Dashboard() {
                             {/* Balance */}
                             <div className="flex items-center gap-1.5 shrink-0">
                                 <span className={cn('font-mono font-black text-sm', isNegative ? 'text-rose-400' : 'text-foreground')}>
-                                    {formatCurrency(acc.balance)}
+                                    {showAmount(acc.balance)}
                                 </span>
                                 <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
                             </div>
@@ -150,6 +178,15 @@ export default function Dashboard() {
                     </button>
                 );
             })}
+
+            <PinDialog
+                open={pinOpen}
+                onOpenChange={setPinOpen}
+                correctPin={BALANCE_PIN}
+                onSuccess={() => setRevealed(true)}
+                title="Show Balances"
+                description="Enter your 4-digit code to reveal amounts"
+            />
         </div>
     );
 }

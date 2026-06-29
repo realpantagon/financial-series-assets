@@ -15,6 +15,10 @@ export default {
                     DEFAULT: 'oklch(var(--card) / <alpha-value>)',
                     foreground: 'oklch(var(--card-foreground) / <alpha-value>)',
                 },
+                popover: {
+                    DEFAULT: 'oklch(var(--popover) / <alpha-value>)',
+                    foreground: 'oklch(var(--popover-foreground) / <alpha-value>)',
+                },
                 primary: {
                     DEFAULT: 'oklch(var(--primary) / <alpha-value>)',
                     foreground: 'oklch(var(--primary-foreground) / <alpha-value>)',
