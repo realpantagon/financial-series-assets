@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+﻿import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
@@ -27,7 +27,7 @@ const AXIS_TICK = { fontSize: 9, fill: '#475569', fontFamily: 'JetBrains Mono, m
 function ChartTip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+        <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
             <p className="text-muted-foreground/60 mb-1">{label}</p>
             {payload.map((p: any, i: number) => p.value != null && (
                 <p key={i} style={{ color: p.color ?? p.fill }}>
@@ -40,7 +40,7 @@ function ChartTip({ active, payload, label }: any) {
 
 function SC({ label, value, sub, cls }: { label: string; value: React.ReactNode; sub?: string; cls?: string }) {
     return (
-        <div className="bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
+        <div className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">{label}</p>
             <p className={cn('font-mono font-black text-sm leading-snug', cls)}>{value}</p>
             {sub && <p className="text-[9px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
@@ -57,7 +57,7 @@ export default function DimeStockYearly() {
     const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
     useEffect(() => {
-        supabase.from('dime_trades').select('*').order('trade_date').then(({ data, error }) => {
+        supabase.from('dime_trades').select('*').eq('asset_class', 'STOCK').order('trade_date').then(({ data, error }) => {
             if (error) toast.error('Failed to load trades', { description: error.message });
             else {
                 setTransactions((data as DimeTransaction[]) ?? []);
@@ -249,7 +249,7 @@ export default function DimeStockYearly() {
 
             {/* All-years P&L bar */}
             {yearlyStats.length > 0 && (
-                <div className="border border-border/20 bg-[oklch(0.105_0.014_255)] p-3">
+                <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
                     <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Realized P&L by Year</p>
                     <ResponsiveContainer width="100%" height={120}>
                         <BarChart data={yearlyStats} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -341,7 +341,7 @@ export default function DimeStockYearly() {
 
                     {/* Monthly P&L chart */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-[oklch(0.105_0.014_255)] p-3">
+                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
                             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Monthly P&L — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={150}>
                                 <ComposedChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -363,7 +363,7 @@ export default function DimeStockYearly() {
 
                     {/* Buy vs Sell by month */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-[oklch(0.105_0.014_255)] p-3">
+                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
                             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Buy vs Sell — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={130}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -379,7 +379,7 @@ export default function DimeStockYearly() {
 
                     {/* Fee by month */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-[oklch(0.105_0.014_255)] p-3">
+                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
                             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Fees by Month — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={100}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -442,7 +442,7 @@ export default function DimeStockYearly() {
                             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-2">
                                 All Symbols — {selected.year} ({yearSymbols.length})
                             </p>
-                            <div className="border border-border/20 bg-[oklch(0.105_0.014_255)] divide-y divide-border/10">
+                            <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] divide-y divide-border/10">
                                 {yearSymbols.map(s => (
                                     <button
                                         key={s.sym}

@@ -69,7 +69,7 @@ export default function Dashboard() {
     return (
         <div className="flex flex-col gap-3 pb-20 pt-4">
             {/* Net Worth Hero */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-[oklch(0.12_0.02_250)] to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
+            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
                 <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
                 <p className="text-[8px] uppercase tracking-[0.16em] text-muted-foreground/40 font-bold mb-1 relative">
                     Total Net Worth
@@ -87,7 +87,7 @@ export default function Dashboard() {
             {/* Salary allocation quick action */}
             <button
                 onClick={() => navigate('/salary')}
-                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-[oklch(0.12_0.015_255)] hover:border-cyan-500/35 hover:bg-[oklch(0.13_0.015_255)] transition-all duration-150 active:scale-[0.99] rounded-xl"
+                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-card hover:border-cyan-500/35 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] rounded-xl"
             >
                 <div className="size-9 rounded-full bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
                     <Banknote className="size-4 text-cyan-400" />
@@ -114,7 +114,7 @@ export default function Dashboard() {
                     <button
                         key={acc.name}
                         onClick={() => navigate(`/account/${encodeURIComponent(acc.name)}`)}
-                        className="w-full text-left border border-border/25 rounded-xl bg-[oklch(0.12_0.015_255)] hover:border-border/50 hover:bg-[oklch(0.13_0.015_255)] transition-all duration-150 active:scale-[0.99] overflow-hidden group"
+                        className="w-full text-left border border-border/25 rounded-xl bg-card hover:border-border/50 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] overflow-hidden group"
                     >
                         <div className="flex items-center gap-3 p-3.5">
                             {/* Icon */}

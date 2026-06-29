@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '../supabaseClient';
@@ -142,7 +142,7 @@ export default function SalaryAllocation() {
                 BACK
             </button>
 
-            <div className="border border-border/30 bg-[oklch(0.11_0.014_255)] flex flex-col gap-5 overflow-visible">
+            <div className="border border-border/30 bg-gray-100 dark:bg-[oklch(0.11_0.014_255)] flex flex-col gap-5 overflow-visible">
                 <div className="px-4 pt-4 flex items-center justify-between">
                     <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground font-bold">
                         Salary Allocation
@@ -196,7 +196,7 @@ export default function SalaryAllocation() {
                                         <SelectTrigger className={cn('h-10 flex-1 rounded-none border-border/30 bg-black/20 text-sm', duplicate && 'border-rose-500/50')}>
                                             <SelectValue placeholder="Select account" />
                                         </SelectTrigger>
-                                        <SelectContent className="rounded-none border border-border/60 bg-[oklch(0.13_0.018_255)] shadow-2xl backdrop-blur-none">
+                                        <SelectContent className="rounded-none border border-border/60 bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] shadow-2xl backdrop-blur-none">
                                             {accountOptions.map(opt => (
                                                 <SelectItem
                                                     key={opt}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
@@ -66,7 +66,7 @@ export default function AddTransaction() {
                 BACK
             </button>
 
-            <div className="border border-border/30 bg-[oklch(0.11_0.014_255)] flex flex-col gap-5 overflow-visible">
+            <div className="border border-border/30 bg-gray-100 dark:bg-[oklch(0.11_0.014_255)] flex flex-col gap-5 overflow-visible">
                 {/* Page header */}
                 <div className="px-4 pt-4">
                     <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground font-bold">New Transaction</p>
@@ -89,7 +89,7 @@ export default function AddTransaction() {
                                             ? isInType
                                                 ? 'bg-emerald-500/12 border-r border-border/20 text-emerald-400'
                                                 : 'bg-rose-500/12 text-rose-400'
-                                            : 'text-muted-foreground hover:bg-white/3 border-r border-border/20 last:border-r-0'
+                                            : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/3 border-r border-border/20 last:border-r-0'
                                     )}
                                 >
                                     <div className={cn(
@@ -150,7 +150,7 @@ export default function AddTransaction() {
                         {/* Dropdown list — rendered in portal-like fixed position within the form */}
                         {accountOpen && (
                             <div
-                                className="absolute left-0 right-0 top-[calc(100%+2px)] z-[100] border border-border/40 bg-[oklch(0.13_0.018_255)] shadow-2xl"
+                                className="absolute left-0 right-0 top-[calc(100%+2px)] z-[100] border border-border/40 bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] shadow-2xl"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {accountOptions.map(opt => (
@@ -162,7 +162,7 @@ export default function AddTransaction() {
                                             'w-full text-left px-3 py-2.5 text-sm border-b border-border/20 last:border-b-0 transition-colors',
                                             accountName === opt
                                                 ? 'text-cyan-300 bg-cyan-500/8 font-bold'
-                                                : 'text-foreground hover:bg-white/5 font-medium'
+                                                : 'text-foreground hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
                                         )}
                                     >
                                         {opt}

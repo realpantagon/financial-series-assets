@@ -5,7 +5,16 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0a0f" />
+    <meta name="theme-color" content="#0a0a0f" id="theme-color-meta" />
+    <!-- Apply theme before paint to avoid flash -->
+    <script>
+      (function () {
+        var t = localStorage.getItem('panassets-theme') || 'dark';
+        document.documentElement.classList.add(t);
+        var meta = document.getElementById('theme-color-meta');
+        if (meta) meta.content = t === 'dark' ? '#0a0a0f' : '#f6f7fb';
+      })();
+    </script>
     <title>Pan Assets</title>
     <!-- JetBrains Mono — terminal geek font -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

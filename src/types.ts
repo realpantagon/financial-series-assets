@@ -35,15 +35,23 @@ export interface PantagonSalaryLog {
   created_at?: string;
 }
 
+export type DimeSide =
+  | 'BUY' | 'SELL' | 'REWARD' | 'EXCALL' | 'EXPUT'   // stock / ETF
+  | 'SUBSCRIB' | 'REDEMP' | 'SWITIN' | 'SWITOUT';    // mutual fund
+
+export type DimeAssetClass = 'STOCK' | 'FUND' | 'GOLD';
+
 export interface DimeTransaction {
   id: number;                // bigint from dime_trades
   order_no: string | null;
   trade_date: string;        // date YYYY-MM-DD
-  side: 'BUY' | 'SELL';
+  side: DimeSide;
   symbol: string;
   market: string | null;
-  qty: number;               // shares
-  price: number;             // price per share
+  asset_class: DimeAssetClass | null;
+  qty: number;               // shares / units / oz
+  qty_unit: string | null;   // SHARES | UNITS | OZ
+  price: number;             // price per unit
   currency: string | null;
   gross_usd: number | null;  // qty * price
   fee_usd: number | null;    // total fees

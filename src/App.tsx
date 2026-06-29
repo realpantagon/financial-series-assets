@@ -1,10 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, History, ArrowLeftRight, TrendingUp, Landmark } from 'lucide-react';
+import { LayoutDashboard, History, ArrowLeftRight, TrendingUp, Landmark, Sun, Moon } from 'lucide-react';
 
 // Lazy-load all routes — keeps initial bundle small (especially the FCD page
 // which pulls in tesseract.js + recharts).
@@ -72,7 +72,7 @@ function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: R
 function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-            <div className="mx-auto max-w-lg border-t border-border/30 bg-[oklch(0.09_0.012_255/0.95)] backdrop-blur-md">
+            <div className="mx-auto max-w-lg border-t border-border/30 bg-card/95 dark:bg-[oklch(0.09_0.012_255/0.95)] backdrop-blur-md">
                 <div className="grid grid-cols-5 h-[72px] items-center pb-8">
                     <NavItem to="/" label="Home" icon={LayoutDashboard} />
                     <NavItem to="/transactions" label="History" icon={History} />
@@ -88,8 +88,23 @@ function BottomNav() {
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 function Header() {
+    const [isDark, setIsDark] = useState(
+        () => document.documentElement.classList.contains('dark')
+    );
+
+    function toggleTheme() {
+        const next = isDark ? 'light' : 'dark';
+        const html = document.documentElement;
+        html.classList.remove('dark', 'light');
+        html.classList.add(next);
+        localStorage.setItem('panassets-theme', next);
+        const meta = document.getElementById('theme-color-meta') as HTMLMetaElement | null;
+        if (meta) meta.content = next === 'dark' ? '#0a0a0f' : '#f6f7fb';
+        setIsDark(!isDark);
+    }
+
     return (
-        <div className="sticky top-0 z-40 border-b border-border/25 bg-[oklch(0.09_0.012_255/0.92)] backdrop-blur-md">
+        <div className="sticky top-0 z-40 border-b border-border/25 bg-card/90 dark:bg-[oklch(0.09_0.012_255/0.92)] backdrop-blur-md">
             <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
                 {/* Logo */}
                 <div className="flex items-center gap-2">
@@ -100,10 +115,24 @@ function Header() {
                         Pan<span className="text-cyan-400">Assets</span>
                     </span>
                 </div>
-                {/* Status */}
-                <div className="flex items-center gap-1.5">
-                    <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
+                {/* Right side */}
+                <div className="flex items-center gap-3">
+                    {/* Theme toggle */}
+                    <button
+                        onClick={toggleTheme}
+                        className="flex items-center justify-center size-7 rounded-md border border-border/40 text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors"
+                        aria-label="Toggle theme"
+                    >
+                        {isDark
+                            ? <Sun className="size-3.5" strokeWidth={2} />
+                            : <Moon className="size-3.5" strokeWidth={2} />
+                        }
+                    </button>
+                    {/* Status */}
+                    <div className="flex items-center gap-1.5">
+                        <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
+                    </div>
                 </div>
             </div>
         </div>

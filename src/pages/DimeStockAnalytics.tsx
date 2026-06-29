@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DimeTransaction } from '../types';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,7 @@ const monthLabel = (m: string) => {
 
 function SC({ label, value, sub, cls }: { label: string; value: React.ReactNode; sub?: string; cls?: string }) {
     return (
-        <div className="bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
+        <div className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
             <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">{label}</p>
             <p className={cn('font-mono font-black text-sm leading-snug', cls)}>{value}</p>
             {sub && <p className="text-[9px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
@@ -78,7 +78,7 @@ function SectionHeader({ title, open, onToggle }: { title: string; open: boolean
 function ChartTip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+        <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
             <p className="text-muted-foreground/60 mb-1">{label}</p>
             {payload.map((p: any, i: number) => (
                 <p key={i} style={{ color: p.color ?? p.fill ?? '#94a3b8' }}>
@@ -371,7 +371,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                             { label: 'Holding', value: overall.openCount, cls: 'text-cyan-300' },
                             { label: 'Closed', value: overall.closedCount, cls: 'text-muted-foreground/60' },
                         ].map(({ label, value, cls }) => (
-                            <div key={label} className="bg-[oklch(0.105_0.014_255)] border border-border/20 p-2 text-center">
+                            <div key={label} className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-2 text-center">
                                 <p className={cn('font-mono font-black text-xl', cls)}>{value}</p>
                                 <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest mt-0.5">{label}</p>
                             </div>
@@ -435,7 +435,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     <p className="text-[9px] text-muted-foreground/30 font-mono">{filtered.length} symbols</p>
 
                     {/* Symbol rows */}
-                    <div className="flex flex-col border border-border/20 bg-[oklch(0.105_0.014_255)]">
+                    <div className="flex flex-col border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)]">
                         {filtered.length === 0 ? (
                             <div className="py-10 text-center text-[10px] text-muted-foreground/30 tracking-wider">NO SYMBOLS FOUND</div>
                         ) : filtered.map(s => {
@@ -692,7 +692,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         <Cell fill={PIE_COLORS.loss} />
                                     </Pie>
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
+                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
                                         : null} />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -709,7 +709,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         <Cell fill={PIE_COLORS.closed} />
                                     </Pie>
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
+                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
                                         : null} />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -731,7 +731,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                     <XAxis dataKey="symbol" tick={{ ...AXIS_TICK, fontSize: 7 }} />
                                     <YAxis tick={AXIS_TICK} tickFormatter={v => `$${v.toFixed(0)}`} />
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">
+                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">
                                             <p className="text-muted-foreground/60">{payload[0].payload.symbol}</p>
                                             <p style={{ color: (payload[0].value as number) >= 0 ? '#34d399' : '#f87171' }}>{d$(payload[0].value as number)}</p>
                                           </div>

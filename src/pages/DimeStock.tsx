@@ -118,7 +118,7 @@ function PositionCard({ s, onClick, price }: { s: SymbolSummary; onClick: () => 
     return (
         <button
             onClick={onClick}
-            className="w-full text-left border border-border/25 rounded-xl bg-[oklch(0.12_0.015_255)] hover:border-cyan-500/20 hover:shadow-[0_0_20px_oklch(0.68_0.18_210/0.06)] transition-all duration-200 active:scale-[0.99] overflow-hidden group"
+            className="w-full text-left border border-border/25 rounded-xl bg-card hover:border-cyan-500/20 hover:shadow-[0_0_20px_oklch(0.68_0.18_210/0.06)] transition-all duration-200 active:scale-[0.99] overflow-hidden group"
         >
             <div className={cn('h-px w-full', hasPosition
                 ? 'bg-gradient-to-r from-cyan-500/50 to-transparent'
@@ -352,7 +352,7 @@ function PortfolioMap({ summaries, onSymbolClick, prices }: {
             </div>
 
             {/* Sorted list */}
-            <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
+            <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
                 {sorted.map((s, i) => {
                     const hasSells = s.totalSellAmount > 0;
                     const hasPos = s.totalShares > 0;
@@ -471,6 +471,7 @@ export default function DimeStock() {
             const { data, error } = await supabase
                 .from('dime_trades')
                 .select('*')
+                .eq('asset_class', 'STOCK')
                 .order('trade_date', { ascending: false });
             if (error) throw error;
             setTransactions((data as DimeTransaction[]) || []);
@@ -620,21 +621,21 @@ export default function DimeStock() {
                             onClick={refreshPrices}
                             disabled={priceLoading}
                             title={priceLoading ? `Fetching prices… ${priceProgress}%` : 'Refresh prices'}
-                            className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 w-9 h-9 rounded-none transition-all disabled:opacity-40"
+                            className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 w-9 h-9 rounded-none transition-all disabled:opacity-40"
                         >
                             <RefreshCw className={cn('size-3.5', priceLoading && 'animate-spin')} />
                         </button>
                     )}
                     <button
                         onClick={() => navigate('/dime-stock/prices')}
-                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
+                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
                     >
                         <Zap className="size-3.5" />
                         LIVE
                     </button>
                     <button
                         onClick={() => navigate('/dime-stock/yearly')}
-                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
+                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
                     >
                         <CalendarDays className="size-3.5" />
                         YEARLY
@@ -650,7 +651,7 @@ export default function DimeStock() {
             </div>
 
             {/* ── Portfolio Hero ── */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-[oklch(0.12_0.02_250)] to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
+            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
                 <Activity className="absolute -right-3 -top-3 size-20 text-cyan-500/4" />
                 <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
                 <div className="relative">
@@ -759,10 +760,10 @@ export default function DimeStock() {
                         </button>
 
                         {filterOpen && (
-                            <div className="absolute right-0 top-[calc(100%+4px)] w-48 z-50 bg-[oklch(0.12_0.02_250)] border border-border/30 shadow-2xl overflow-hidden max-h-60 flex flex-col">
+                            <div className="absolute right-0 top-[calc(100%+4px)] w-48 z-50 bg-slate-50 dark:bg-[oklch(0.12_0.02_250)] border border-border/30 shadow-2xl overflow-hidden max-h-60 flex flex-col">
                                 <button
                                     onClick={() => setSymbolFilter('')}
-                                    className="px-3 py-2.5 text-left text-[10px] font-bold tracking-widest text-muted-foreground hover:bg-white/5 border-b border-border/10 flex items-center gap-2"
+                                    className="px-3 py-2.5 text-left text-[10px] font-bold tracking-widest text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/5 border-b border-border/10 flex items-center gap-2"
                                 >
                                     {!symbolFilter ? <Check className="size-3 text-cyan-400" /> : <div className="size-3" />}
                                     ALL STOCKS
@@ -772,7 +773,7 @@ export default function DimeStock() {
                                         <button
                                             key={s.symbol}
                                             onClick={() => setSymbolFilter(s.symbol)}
-                                            className="w-full px-3 py-2 text-left text-sm font-mono font-bold hover:bg-white/5 flex items-center justify-between"
+                                            className="w-full px-3 py-2 text-left text-sm font-mono font-bold hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between"
                                         >
                                             <div className="flex items-center gap-2">
                                                 {symbolFilter === s.symbol ? <Check className="size-3 text-cyan-400" /> : <div className="size-3" />}
@@ -842,7 +843,7 @@ export default function DimeStock() {
                                 <p className="text-[10px] tracking-wider">NO TRADES FOUND</p>
                             </div>
                         ) : (
-                            <div className="border border-border/20 rounded-none bg-[oklch(0.11_0.015_255/0.7)] overflow-hidden">
+                            <div className="border border-border/20 rounded-none bg-gray-100/70 dark:bg-[oklch(0.11_0.015_255/0.7)] overflow-hidden">
                                 {[...filteredTransactions]
                                     .sort((a, b) => {
                                         const d = b.trade_date.localeCompare(a.trade_date);

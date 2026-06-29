@@ -1,8 +1,8 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
 import { useCallback, useEffect, useState } from "react"
-import { fetchFCDEntries, addFCDEntry, calculateFCDStats, formatCurrency } from "../api/fcd"
+import { fetchAllFCDEntries, addFCDEntry, calculateFCDStats, formatCurrency } from "../api/fcd"
 import type { FCDEntry, FCDStats, NewFCDEntry, FCDTxType } from "../api/fcd/types"
 import { format, parseISO, parse } from "date-fns"
 import Input from "../components/fcd/Input"
@@ -76,7 +76,7 @@ export default function FCDDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await fetchFCDEntries()
+      const data = await fetchAllFCDEntries()
       setEntries(data)
       const calculatedStats = calculateFCDStats(data)
       setStats(calculatedStats)
@@ -333,7 +333,7 @@ export default function FCDDashboard() {
   return (
     <div className="min-h-[calc(100vh-80px)] bg-background text-foreground pb-8 font-mono">
       {/* Header */}
-      <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md border-b border-border/20 px-3 py-3 mb-2">
+      <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md border-b border-border/20 px-3 py-3 mb-2">
         <div className="flex justify-between items-start gap-3">
           <div>
             <h1 className="text-xl font-bold font-mono tracking-tight text-foreground">FCD Tracker</h1>
@@ -353,7 +353,7 @@ export default function FCDDashboard() {
         {/* Summary Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {/* Liquidity Section */}
-          <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
+          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
             <h3 className="text-sm font-bold text-muted-foreground/60 uppercase tracking-wider mb-4 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Liquidity
@@ -393,7 +393,7 @@ export default function FCDDashboard() {
             </div>
           </div>
 
-          <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
+          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
             <h3 className="text-sm font-bold text-muted-foreground/60 uppercase tracking-wider mb-4 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
               Performance
@@ -423,7 +423,7 @@ export default function FCDDashboard() {
 
         {/* Exchange Rate Chart */}
         {rateChartData.length > 0 && (
-          <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
+          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h2 className="text-base font-bold text-foreground">Exchange Rate Trend</h2>
@@ -476,10 +476,10 @@ export default function FCDDashboard() {
         )}
 
         {/* Add Entry Form */}
-        <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none overflow-hidden">
+        <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none overflow-hidden">
           <button
             onClick={() => setShowAddEntry(!showAddEntry)}
-            className="w-full px-3 py-3 flex justify-between items-center text-left hover:bg-white/5 transition-colors"
+            className="w-full px-3 py-3 flex justify-between items-center text-left hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -499,11 +499,9 @@ export default function FCDDashboard() {
                   <select
                     value={entryData.tx_type}
                     onChange={(e) => handleTxTypeChange(e.target.value as FCDTxType)}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md transition-all shadow-none"
+                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md transition-all shadow-none"
                   >
                     <option value="FX">💱 FX Exchange</option>
-                    <option value="GOLD_BUY">🟡 Gold Buy</option>
-                    <option value="GOLD_SELL">💰 Gold Sell</option>
                     <option value="INTEREST">📈 Interest</option>
                     <option value="TRANSFER">↔️ Transfer</option>
                   </select>
@@ -537,7 +535,7 @@ export default function FCDDashboard() {
                     value={entryData.status}
                     onChange={(e) => setEntryData({ ...entryData, status: e.target.value })}
                     disabled={entryData.tx_type !== 'TRANSFER'}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md disabled:bg-white/5 disabled:text-muted-foreground/60 transition-all shadow-none"
+                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md disabled:bg-white/5 disabled:text-muted-foreground/60 transition-all shadow-none"
                   >
                     <option value="IN">Create Income (IN)</option>
                     <option value="OUT">Create Expense (OUT)</option>
@@ -592,7 +590,7 @@ export default function FCDDashboard() {
         </div>
 
         {/* Entries List */}
-        <div className="bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none">
+        <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-base font-bold text-foreground">Recent Transactions</h2>
             <span className="text-xs font-medium text-muted-foreground/60">{entries.length} records</span>
@@ -638,7 +636,7 @@ export default function FCDDashboard() {
                 // Actually sticking to "Performance" colors (profit=green) is better.
 
                 return (
-                  <div key={entry.id} className="group p-3 bg-transparent rounded-none border-b border-border/20 last:border-b-0 hover:bg-white/5 transition-all duration-200">
+                  <div key={entry.id} className="group p-3 bg-transparent rounded-none border-b border-border/20 last:border-b-0 hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-200">
                     <div className="flex justify-between items-start">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-none bg-black/20 flex items-center justify-center border border-border/20 group-hover:bg-cyan-500/10 transition-all text-sm">
@@ -656,6 +654,15 @@ export default function FCDDashboard() {
                           </div>
                           <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                             <span>{format(parseISO(entry.date), "dd MMM yyyy, HH:mm")}</span>
+                            {entry.origin === 'dime' && entry.symbol && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                <span className="font-medium text-muted-foreground">
+                                  {entry.symbol} · {Number(entry.qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} {entry.qty_unit ?? ''}
+                                </span>
+                                <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide rounded bg-cyan-500/15 border border-cyan-500/20 text-cyan-400">auto</span>
+                              </>
+                            )}
                             {entry.rate && (
                               <>
                                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
@@ -664,7 +671,7 @@ export default function FCDDashboard() {
                             )}
                           </div>
                           {entry.note && (
-                            <div className="mt-2 text-xs text-muted-foreground bg-white/5 px-2.5 py-1.5 rounded-lg inline-block border border-border/20 italic">
+                            <div className="mt-2 text-xs text-muted-foreground bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg inline-block border border-border/20 italic">
                               {entry.note}
                             </div>
                           )}
@@ -687,7 +694,7 @@ export default function FCDDashboard() {
               })}
 
               {entries.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground/60 bg-white/5 rounded-xl border border-dashed border-border/20">
+                <div className="text-center py-12 text-muted-foreground/60 bg-slate-100 dark:bg-white/5 rounded-xl border border-dashed border-border/20">
                   <div className="text-4xl mb-3">📝</div>
                   <p>No transactions yet.</p>
                   <button onClick={() => setShowAddEntry(true)} className="text-cyan-400 font-medium text-sm mt-2 hover:underline">
@@ -701,7 +708,7 @@ export default function FCDDashboard() {
                   <Button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="bg-black/20 hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
+                    className="bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
                   >
                     PREV
                   </Button>
@@ -709,7 +716,7 @@ export default function FCDDashboard() {
                   <Button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="bg-black/20 hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
+                    className="bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
                   >
                     NEXT
                   </Button>
@@ -725,7 +732,7 @@ export default function FCDDashboard() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed top-0 inset-x-0 z-[60] h-[100dvh] bg-black/70 backdrop-blur-md flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-md bg-[oklch(0.09_0.012_255/0.95)] border-t sm:border border-border/30 rounded-none p-4 pb-12 sm:pb-6 max-h-[90vh] overflow-y-auto animate-slide-up shadow-2xl">
+          <div className="w-full sm:max-w-md bg-white/95 dark:bg-[oklch(0.09_0.012_255/0.95)] border-t sm:border border-border/30 rounded-none p-4 pb-12 sm:pb-6 max-h-[90vh] overflow-y-auto animate-slide-up shadow-2xl">
             <div className="flex justify-between items-center mb-4 border-b border-border/20 pb-3">
               <h3 className="text-sm tracking-[0.1em] font-bold text-foreground uppercase">Upload Slip</h3>
               <button
@@ -815,7 +822,7 @@ export default function FCDDashboard() {
                     />
                   </label>
                   <div className="flex gap-3 pt-2">
-                    <Button onClick={resetOCR} className="flex-1 bg-transparent border border-border/30 hover:bg-white/5 text-foreground py-3 h-12">
+                    <Button onClick={resetOCR} className="flex-1 bg-transparent border border-border/30 hover:bg-slate-100 dark:hover:bg-white/5 text-foreground py-3 h-12">
                       Clear
                     </Button>
                     <Button onClick={fillFromModal} className="flex-1 bg-cyan-500 text-black hover:bg-cyan-400 py-3 h-12 border border-cyan-500/40">

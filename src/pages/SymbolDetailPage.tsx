@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+﻿import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
@@ -66,6 +66,7 @@ export default function SymbolDetailPage() {
         const { data, error } = await supabase
             .from('dime_trades')
             .select('*')
+            .eq('asset_class', 'STOCK')
             .eq('symbol', symbol!)
             .order('trade_date', { ascending: false });
         if (error) toast.error('Failed to load trades', { description: error.message });
@@ -173,7 +174,7 @@ export default function SymbolDetailPage() {
             </button>
 
             {/* Hero card */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-[oklch(0.13_0.02_250)] to-[oklch(0.09_0.03_230)] overflow-hidden relative">
+            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.13_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.03_230)] overflow-hidden relative">
                 <Activity className="absolute -right-4 -bottom-4 size-28 text-cyan-500/4" />
                 <div className="h-px w-full bg-gradient-to-r from-cyan-500/60 via-cyan-400/20 to-transparent" />
 
@@ -267,7 +268,7 @@ export default function SymbolDetailPage() {
 
             {/* Trade chart */}
             {chartData.length > 1 && (
-                <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] p-3">
+                <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.10_0.013_255)] p-3">
                     <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.16em] mb-3">Trade History</p>
                     <ResponsiveContainer width="100%" height={160}>
                         <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -280,7 +281,7 @@ export default function SymbolDetailPage() {
                             <RCTip content={({ active, payload, label }: any) => {
                                 if (!active || !payload?.length) return null;
                                 return (
-                                    <div className="bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+                                    <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
                                         <p className="text-muted-foreground/60 mb-1">{label}</p>
                                         {payload.map((p: any, i: number) => p.value != null && (
                                             <p key={i} style={{ color: p.color ?? p.fill }}>
@@ -335,7 +336,7 @@ export default function SymbolDetailPage() {
                             <div key={tx.id} className="flex gap-3 relative" style={{ zIndex: 1 }}>
                                 <div className={cn('size-[9px] rounded-full mt-3 shrink-0 ring-2 ring-background', dotColor)} />
 
-                                <div className="flex-1 border border-border/25 rounded-lg bg-[oklch(0.12_0.015_255/0.6)] p-3 hover:border-border/50 transition-colors group">
+                                <div className="flex-1 border border-border/25 rounded-lg bg-white/60 dark:bg-[oklch(0.12_0.015_255/0.6)] p-3 hover:border-border/50 transition-colors group">
                                     <div className="flex items-center justify-between mb-1.5">
                                         <div className="flex items-center gap-2">
                                             <SidePill side={tx.side} />

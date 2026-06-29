@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { FinancialTransaction } from '../types';
@@ -146,7 +146,7 @@ export default function AccountDetails() {
                             const isIn = item.type === 'IN';
                             return (
                                 <div key={item.id}>
-                                    <div className="px-4 py-3 flex items-center justify-between hover:bg-white/2 transition-colors">
+                                    <div className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/2 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className={cn(
                                                 'size-9 rounded-full flex items-center justify-center flex-shrink-0 border',

@@ -68,8 +68,10 @@ button, a, [role="button"] {
 /* ── Thin scrollbar ── */
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.28 0.04 240); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: oklch(0.4 0.1 210); }
+::-webkit-scrollbar-thumb { background: oklch(0.78 0.04 240); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.55 0.1 210); }
+.dark ::-webkit-scrollbar-thumb { background: oklch(0.28 0.04 240); }
+.dark ::-webkit-scrollbar-thumb:hover { background: oklch(0.4 0.1 210); }
 
 /* ── Bottom sheet modal animation ── */
 @keyframes sheet-up {
@@ -90,32 +92,68 @@ button, a, [role="button"] {
 .animate-backdrop   { animation: backdrop-in 0.2s ease forwards; }
 
 @layer base {
+  /* ── Light mode (default) ── */
   :root {
-    /* ── Near-black terminal dark ── */
-    --background: 0.08 0.01 260;          /* #09090f near-black with cool tint */
-    --foreground: 0.96 0.008 240;          /* bright near-white, cool tint */
-    --card: 0.11 0.015 255;              /* #0d0d18 slightly lighter card */
+    --background: 0.955 0.007 240;
+    --foreground: 0.12 0.024 255;
+    --card: 0.995 0.002 240;
+    --card-foreground: 0.12 0.024 255;
+    --popover: 0.995 0.002 240;
+    --popover-foreground: 0.12 0.024 255;
+    --primary: 0.52 0.18 240;
+    --primary-foreground: 1.0 0 0;
+    --secondary: 0.93 0.012 240;
+    --secondary-foreground: 0.12 0.024 255;
+    --muted: 0.91 0.014 240;
+    --muted-foreground: 0.36 0.042 245;
+    --accent: 0.90 0.017 240;
+    --accent-foreground: 0.12 0.024 255;
+    --destructive: 0.55 0.22 20;
+    --border: 0.81 0.022 240;
+    --input: 0.92 0.012 240;
+    --ring: 0.52 0.18 240;
+    --chart-1: 0.52 0.18 240;
+    --chart-2: 0.55 0.18 150;
+    --chart-3: 0.60 0.16 70;
+    --chart-4: 0.55 0.20 290;
+    --chart-5: 0.58 0.16 25;
+    --radius: 0.5rem;
+    --sidebar: 0.95 0.008 240;
+    --sidebar-foreground: 0.12 0.024 255;
+    --sidebar-primary: 0.52 0.18 240;
+    --sidebar-primary-foreground: 1.0 0 0;
+    --sidebar-accent: 0.91 0.015 240;
+    --sidebar-accent-foreground: 0.12 0.024 255;
+    --sidebar-border: 0.81 0.022 240;
+    --sidebar-ring: 0.52 0.18 240;
+    --grid-dot: oklch(0.52 0.18 240 / 0.05);
+  }
+
+  /* ── Dark mode ── */
+  .dark {
+    --background: 0.075 0.012 260;
+    --foreground: 0.96 0.008 240;
+    --card: 0.105 0.016 255;
     --card-foreground: 0.96 0.008 240;
     --popover: 0.13 0.015 255;
     --popover-foreground: 0.96 0.008 240;
-    --primary: 0.68 0.18 210;            /* electric cyan-blue — terminal cyan */
-    --primary-foreground: 0.06 0.01 260; /* near black on primary */
+    --primary: 0.68 0.18 210;
+    --primary-foreground: 0.06 0.01 260;
     --secondary: 0.14 0.015 255;
     --secondary-foreground: 0.96 0.008 240;
     --muted: 0.15 0.015 255;
-    --muted-foreground: 0.62 0.04 240;   /* brighter dim cool gray — readable */
+    --muted-foreground: 0.70 0.035 240;
     --accent: 0.16 0.02 255;
     --accent-foreground: 0.96 0.008 240;
     --destructive: 0.58 0.22 20;
-    --border: 0.22 0.028 255;            /* slightly brighter dim border */
+    --border: 0.22 0.028 255;
     --input: 0.14 0.016 255;
-    --ring: 0.68 0.18 210;               /* cyan focus ring */
-    --chart-1: 0.68 0.18 210;            /* cyan */
-    --chart-2: 0.7 0.2 150;             /* neon green */
-    --chart-3: 0.75 0.18 70;            /* amber */
-    --chart-4: 0.65 0.22 290;           /* violet */
-    --chart-5: 0.7 0.18 25;             /* orange */
-    --radius: 0.5rem;
+    --ring: 0.68 0.18 210;
+    --chart-1: 0.68 0.18 210;
+    --chart-2: 0.7 0.2 150;
+    --chart-3: 0.75 0.18 70;
+    --chart-4: 0.65 0.22 290;
+    --chart-5: 0.7 0.18 25;
     --sidebar: 0.1 0.015 255;
     --sidebar-foreground: 0.93 0.01 240;
     --sidebar-primary: 0.68 0.18 210;
@@ -124,6 +162,7 @@ button, a, [role="button"] {
     --sidebar-accent-foreground: 0.93 0.01 240;
     --sidebar-border: 0.19 0.025 255;
     --sidebar-ring: 0.68 0.18 210;
+    --grid-dot: oklch(0.68 0.18 210 / 0.03);
   }
 
   * {
@@ -133,9 +172,7 @@ button, a, [role="button"] {
   body {
     @apply bg-background text-foreground;
     font-family: 'JetBrains Mono', monospace;
-    /* Ultra-subtle dot grid — terminal feel */
-    background-image:
-      radial-gradient(circle, oklch(0.68 0.18 210 / 0.03) 1px, transparent 1px);
+    background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 
@@ -143,9 +180,81 @@ button, a, [role="button"] {
     font-family: 'JetBrains Mono', monospace;
   }
 
-  /* Tabular numbers everywhere */
   .num, [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum", "ss02";
+  }
+}
+
+@layer utilities {
+  /* Readability floor for tiny mono labels used throughout the app. */
+  .text-muted-foreground\/20 { color: oklch(var(--muted-foreground) / 0.56); }
+  .text-muted-foreground\/25 { color: oklch(var(--muted-foreground) / 0.60); }
+  .text-muted-foreground\/30 { color: oklch(var(--muted-foreground) / 0.66); }
+  .text-muted-foreground\/35 { color: oklch(var(--muted-foreground) / 0.72); }
+  .text-muted-foreground\/40 { color: oklch(var(--muted-foreground) / 0.78); }
+  .text-muted-foreground\/50 { color: oklch(var(--muted-foreground) / 0.86); }
+  .text-muted-foreground\/60 { color: oklch(var(--muted-foreground) / 0.92); }
+  .placeholder\:text-muted-foreground\/30::placeholder { color: oklch(var(--muted-foreground) / 0.66); }
+  .placeholder\:text-muted-foreground\/40::placeholder { color: oklch(var(--muted-foreground) / 0.78); }
+  .text-border\/30 { color: oklch(var(--border) / 0.85); }
+  .text-foreground\/60 { color: oklch(var(--foreground) / 0.78); }
+  .text-foreground\/70 { color: oklch(var(--foreground) / 0.84); }
+  .text-foreground\/80 { color: oklch(var(--foreground) / 0.90); }
+  .text-foreground\/90 { color: oklch(var(--foreground) / 0.96); }
+
+  html:not(.dark) .bg-black\/20 { background-color: oklch(var(--muted) / 0.72); }
+  html:not(.dark) .bg-black\/30 { background-color: oklch(0.86 0.016 240 / 0.82); }
+  html:not(.dark) .bg-white\/3 { background-color: oklch(var(--card) / 0.86); }
+  html:not(.dark) .text-cyan-300,
+  html:not(.dark) .text-cyan-400,
+  html:not(.dark) .data-\[state\=active\]\:text-cyan-300[data-state="active"] {
+    color: oklch(0.48 0.14 220);
+  }
+  html:not(.dark) .text-cyan-400\/40 { color: oklch(0.48 0.14 220 / 0.68); }
+  html:not(.dark) .text-cyan-400\/50 { color: oklch(0.48 0.14 220 / 0.74); }
+  html:not(.dark) .text-cyan-400\/60 { color: oklch(0.48 0.14 220 / 0.80); }
+  html:not(.dark) .text-emerald-300,
+  html:not(.dark) .text-emerald-400 {
+    color: oklch(0.48 0.16 155);
+  }
+  html:not(.dark) .text-emerald-400\/50 { color: oklch(0.48 0.16 155 / 0.76); }
+  html:not(.dark) .text-emerald-400\/60 { color: oklch(0.48 0.16 155 / 0.82); }
+  html:not(.dark) .text-emerald-400\/70,
+  html:not(.dark) .text-emerald-400\/80 { color: oklch(0.48 0.16 155 / 0.88); }
+  html:not(.dark) .text-rose-300,
+  html:not(.dark) .text-rose-400 {
+    color: oklch(0.52 0.18 20);
+  }
+  html:not(.dark) .text-rose-400\/50 { color: oklch(0.52 0.18 20 / 0.76); }
+  html:not(.dark) .text-rose-400\/60 { color: oklch(0.52 0.18 20 / 0.82); }
+  html:not(.dark) .text-rose-400\/70,
+  html:not(.dark) .text-rose-400\/80 { color: oklch(0.52 0.18 20 / 0.88); }
+  html:not(.dark) .text-amber-300,
+  html:not(.dark) .text-amber-400,
+  html:not(.dark) .text-amber-500 {
+    color: oklch(0.50 0.13 75);
+  }
+  html:not(.dark) .text-amber-400\/50 { color: oklch(0.50 0.13 75 / 0.76); }
+  html:not(.dark) .text-amber-400\/60,
+  html:not(.dark) .text-amber-400\/70,
+  html:not(.dark) .text-amber-400\/80 { color: oklch(0.50 0.13 75 / 0.86); }
+  html:not(.dark) .bg-cyan-500\/10,
+  html:not(.dark) .data-\[state\=active\]\:bg-cyan-500\/10[data-state="active"] {
+    background-color: oklch(0.86 0.065 220 / 0.90);
+  }
+  html:not(.dark) .bg-cyan-500\/12 { background-color: oklch(0.85 0.07 220 / 0.92); }
+  html:not(.dark) .bg-cyan-500\/15 { background-color: oklch(0.83 0.075 220 / 0.94); }
+  html:not(.dark) .bg-cyan-500\/20 { background-color: oklch(0.80 0.085 220 / 0.95); }
+  html:not(.dark) .border-cyan-500\/20,
+  html:not(.dark) .border-cyan-500\/25,
+  html:not(.dark) .border-cyan-500\/30,
+  html:not(.dark) .border-cyan-500\/40 {
+    border-color: oklch(0.64 0.11 220 / 0.70);
+  }
+
+  html.dark .dark\:bg-white\/90,
+  html.dark .dark\:bg-white\/95 {
+    background-color: oklch(var(--card) / 0.94) !important;
   }
 }

@@ -115,7 +115,9 @@ function buildDimePayload(p: Record<string, unknown>) {
         side: p.side,
         symbol: String(p.symbol).toUpperCase().trim(),
         market: null,
+        asset_class: 'STOCK',
         qty,
+        qty_unit: 'SHARES',
         price: execPrice,
         currency: 'USD',
         gross_usd,
@@ -257,7 +259,7 @@ export default function AddTradePage() {
                 BACK
             </button>
 
-            <div className="border border-border/30 bg-[oklch(0.12_0.018_255)] flex flex-col gap-0 overflow-visible">
+            <div className="border border-border/30 bg-card flex flex-col gap-0 overflow-visible">
                 <div className="px-4 py-4 flex items-center gap-2">
                     <div className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.16em]">New Trade</span>
@@ -276,7 +278,7 @@ export default function AddTradePage() {
                                         ? s === 'BUY'
                                             ? 'bg-cyan-500/12 text-cyan-300 border-r border-border/20 last:border-r-0'
                                             : 'bg-emerald-500/12 text-emerald-300 border-r border-border/20 last:border-r-0'
-                                        : 'text-muted-foreground hover:bg-white/3 border-r border-border/20 last:border-r-0'
+                                        : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/3 border-r border-border/20 last:border-r-0'
                                 )}
                             >
                                 {s}
@@ -331,7 +333,7 @@ export default function AddTradePage() {
                                         </div>
                                         {batchError && <p className="text-[10px] text-rose-400 mt-1">{batchError}</p>}
                                         <div className="flex gap-2 mt-2">
-                                            <Button variant="outline" size="sm" onClick={() => setBatchPreview(null)} className="flex-1 border-border/30 text-[10px] tracking-wider font-bold h-9 bg-transparent hover:bg-white/5 rounded-none">CANCEL</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setBatchPreview(null)} className="flex-1 border-border/30 text-[10px] tracking-wider font-bold h-9 bg-transparent hover:bg-slate-100 dark:hover:bg-white/5 rounded-none">CANCEL</Button>
                                             <Button size="sm" onClick={handleBatchSave} disabled={batchSaving} className="flex-1 bg-amber-500 hover:bg-amber-400 text-black text-[10px] tracking-wider font-bold h-9 rounded-none">
                                                 {batchSaving ? <span className="flex items-center"><Loader2 className="size-3.5 animate-spin mr-1.5" /> SAVING…</span> : <span className="flex items-center"><Upload className="size-3.5 mr-1.5" /> IMPORT {batchPreview.length}</span>}
                                             </Button>

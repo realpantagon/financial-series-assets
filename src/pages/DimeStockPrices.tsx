@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+﻿import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import type { DimeTransaction } from '../types';
@@ -61,6 +61,7 @@ export default function DimeStockPrices() {
         const { data } = await supabase
             .from('dime_trades')
             .select('id,trade_date,side,symbol,qty,gross_usd,fee_usd,net_usd')
+            .eq('asset_class', 'STOCK')
             .order('trade_date', { ascending: true });
         setTransactions((data as DimeTransaction[]) || []);
         setLoading(false);
@@ -201,7 +202,7 @@ export default function DimeStockPrices() {
                     <button
                         onClick={refreshPrices}
                         disabled={priceLoading}
-                        className="flex items-center gap-1.5 px-3 h-9 border border-border/20 bg-black/20 hover:bg-white/5 text-muted-foreground/60 hover:text-foreground text-[10px] font-bold tracking-widest transition-all disabled:opacity-40"
+                        className="flex items-center gap-1.5 px-3 h-9 border border-border/20 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground text-[10px] font-bold tracking-widest transition-all disabled:opacity-40"
                     >
                         <RefreshCw className={cn('size-3.5', priceLoading && 'animate-spin')} />
                         {priceLoading ? `${progress}%` : 'REFRESH'}
@@ -226,7 +227,7 @@ export default function DimeStockPrices() {
 
             {/* Portfolio value hero */}
             {hasPrices && (
-                <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-[oklch(0.12_0.02_250)] to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
+                <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
                     <Activity className="absolute -right-3 -top-3 size-20 text-cyan-500/4" />
                     <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
                     <div className="relative">
@@ -334,7 +335,7 @@ export default function DimeStockPrices() {
                     ))}
                 </div>
 
-                <div className="border border-border/20 bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
+                <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
                     {sortedRows.map((r, i) => {
                         const hasQ  = !!r.q;
                         const plPos = (r.unrealPL ?? 0) >= 0;

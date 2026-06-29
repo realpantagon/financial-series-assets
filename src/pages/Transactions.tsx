@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,7 +86,7 @@ export default function Transactions() {
             </div>
 
             {/* List */}
-            <div className="rounded-xl border border-border/20 bg-[oklch(0.11_0.014_255/0.7)] overflow-hidden">
+            <div className="rounded-xl border border-border/20 bg-gray-100/70 dark:bg-[oklch(0.11_0.014_255/0.7)] overflow-hidden">
                 {paged.length === 0 ? (
                     <div className="py-16 text-center text-muted-foreground/30 text-[10px] tracking-wider">
                         NO TRANSACTIONS FOUND
@@ -100,7 +100,7 @@ export default function Transactions() {
                             <div
                                 key={item.id}
                                 className={cn(
-                                    'flex items-center gap-3 px-3 py-2.5 hover:bg-white/1 transition-colors',
+                                    'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/1 transition-colors',
                                     idx < paged.length - 1 && 'border-b border-border/15'
                                 )}
                             >

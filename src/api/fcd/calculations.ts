@@ -62,7 +62,7 @@ export function calculateFCDStats(entries: FCDEntry[]): FCDStats {
     cash_remain,
     gold_profit,
     interest_income,
-    
+
     // Mapped legacy fields
     total_usd: cash_remain, // Mapping total_usd to cash_remain for backward comp if needed
     total_thb,

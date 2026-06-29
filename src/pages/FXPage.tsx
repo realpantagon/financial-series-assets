@@ -158,7 +158,7 @@ export default function FXPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => navigate('/fx/analytics')}
-                        className="gap-1.5 text-[10px] font-bold border-border/30 bg-transparent hover:bg-white/3 tracking-wider h-8 px-3"
+                        className="gap-1.5 text-[10px] font-bold border-border/30 bg-transparent hover:bg-slate-100 dark:hover:bg-white/3 tracking-wider h-8 px-3"
                     >
                         <BarChart2 className="size-3" />
                         ANALYTICS
@@ -179,7 +179,7 @@ export default function FXPage() {
 
             {/* Add Form */}
             {showForm && (
-                <div className="rounded-xl border border-border/25 bg-[oklch(0.12_0.015_255)] p-4 animate-in slide-in-from-top-2 duration-200">
+                <div className="rounded-xl border border-border/25 bg-card p-4 animate-in slide-in-from-top-2 duration-200">
                         <h2 className="text-[9px] uppercase tracking-[0.14em] font-bold text-muted-foreground/40 mb-3">ADD FOREIGN EXCHANGE</h2>
                         <form onSubmit={handleSave} className="flex flex-col gap-3">
                             <div className="grid grid-cols-2 gap-3">
@@ -255,7 +255,7 @@ export default function FXPage() {
             {/* Month Selector */}
             {!showForm && (
                 <>
-                    <div className="flex items-center justify-between bg-[oklch(0.12_0.015_255)] border border-border/20 rounded-xl p-2">
+                    <div className="flex items-center justify-between bg-card border border-border/20 rounded-xl p-2">
                         <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="size-9">
                             <ChevronLeft className="size-4" />
                         </Button>
@@ -311,7 +311,7 @@ export default function FXPage() {
                                 const isIn = item.to_currency === 'USD';
                                 const isOut = item.from_currency === 'USD';
                                 return (
-                                    <div key={item.id} className="rounded-xl border border-border/20 bg-[oklch(0.12_0.015_255)] overflow-hidden">
+                                    <div key={item.id} className="rounded-xl border border-border/20 bg-card overflow-hidden">
                                         <div className={cn(
                                             'w-full h-0.5',
                                             isIn ? 'bg-emerald-500/70' : isOut ? 'bg-rose-500/70' : 'bg-border/50'
