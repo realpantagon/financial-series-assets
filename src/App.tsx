@@ -19,6 +19,7 @@ const SymbolDetailPage = lazy(() => import('@/pages/SymbolDetailPage'));
 const AddTradePage = lazy(() => import('@/pages/AddTradePage'));
 const FCDDashboard = lazy(() => import('@/pages/FCDDashboard'));
 const SalaryAllocation = lazy(() => import('@/pages/SalaryAllocation'));
+const AddTransfer = lazy(() => import('@/pages/AddTransfer'));
 const DimeStockYearly = lazy(() => import('@/pages/DimeStockYearly'));
 
 function RouteFallback() {
@@ -161,6 +162,7 @@ function App() {
                                 <Route path="/account/:accountName" element={<AccountDetails />} />
                                 <Route path="/fcd" element={<FCDDashboard />} />
                                 <Route path="/salary" element={<SalaryAllocation />} />
+                                <Route path="/transfer" element={<AddTransfer />} />
                             </Routes>
                         </Suspense>
                     </div>

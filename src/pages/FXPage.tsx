@@ -99,6 +99,12 @@ export default function FXPage() {
         }
     };
 
+    const liveRate = useMemo(() => {
+        const thb = Number(form.thb_amount);
+        const foreign = Number(form.foreign_amount);
+        return thb > 0 && foreign > 0 ? thb / foreign : null;
+    }, [form.thb_amount, form.foreign_amount]);
+
     const availableYears = useMemo(() => {
         const years = new Set(data.map(item => new Date(item.transaction_at).getFullYear()));
         return Array.from(years).sort((a, b) => b - a);
@@ -236,8 +242,22 @@ export default function FXPage() {
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rate (optional — auto-calculated)</label>
-                                <Input type="number" step="0.000001" value={form.exchange_rate} onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })} placeholder="Auto" className="h-9 text-sm font-semibold" />
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rate (optional — auto-calculated)</label>
+                                    {liveRate !== null && (
+                                        <span className="text-[10px] font-mono font-bold text-cyan-400">
+                                            1 {form.to_currency || '?'} = {liveRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} THB
+                                        </span>
+                                    )}
+                                </div>
+                                <Input
+                                    type="number"
+                                    step="0.000001"
+                                    value={form.exchange_rate}
+                                    onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })}
+                                    placeholder={liveRate !== null ? liveRate.toFixed(6) : 'Auto'}
+                                    className="h-9 text-sm font-semibold"
+                                />
                             </div>
 
                             <div className="flex flex-col gap-1.5">

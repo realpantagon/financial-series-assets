@@ -100,7 +100,7 @@ export default function Transactions() {
                             <div
                                 key={item.id}
                                 className={cn(
-                                    'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/1 transition-colors',
+                                    'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/[0.01] transition-colors',
                                     idx < paged.length - 1 && 'border-b border-border/15'
                                 )}
                             >

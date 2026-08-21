@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useAccounts } from '@/lib/accounts';
+import { AccountOption } from '@/components/AccountOption';
 import { cn, getErrorMessage } from '@/lib/utils';
 import { ChevronLeft, Plus, X, Copy, Loader2, Wallet } from 'lucide-react';
 
@@ -203,7 +204,7 @@ export default function SalaryAllocation() {
                                                     value={opt}
                                                     disabled={usedAccounts.has(opt) && row.account_name !== opt}
                                                 >
-                                                    {opt}
+                                                    <AccountOption name={opt} />
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

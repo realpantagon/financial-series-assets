@@ -6,7 +6,7 @@ import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAccounts, getAccountIcon } from '@/lib/accounts';
-import { ChevronRight, Wallet, Banknote, Eye, EyeOff } from 'lucide-react';
+import { ChevronRight, Wallet, Banknote, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
 import { PinDialog } from '@/components/PinDialog';
 
 // Code required to reveal balances on the home screen.
@@ -121,6 +121,18 @@ export default function Dashboard() {
                     <Banknote className="size-4 text-cyan-400" />
                 </div>
                 <span className="font-bold text-sm text-foreground flex-1 text-left">Salary Allocation</span>
+                <ChevronRight className="size-3.5 text-muted-foreground/20" />
+            </button>
+
+            {/* Transfer between accounts quick action */}
+            <button
+                onClick={() => navigate('/transfer')}
+                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-card hover:border-cyan-500/35 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] rounded-xl"
+            >
+                <div className="size-9 rounded-full bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
+                    <ArrowRightLeft className="size-4 text-cyan-400" />
+                </div>
+                <span className="font-bold text-sm text-foreground flex-1 text-left">Transfer Between Accounts</span>
                 <ChevronRight className="size-3.5 text-muted-foreground/20" />
             </button>
 

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useAccounts } from '@/lib/accounts';
+import { AccountOption } from '@/components/AccountOption';
 import { ArrowDownLeft, ArrowUpRight, DollarSign, Tag, FileText, Loader2, ChevronLeft, ChevronDown } from 'lucide-react';
 
 export default function AddTransaction() {
@@ -143,7 +144,7 @@ export default function AddTransaction() {
                                 !accountName && 'text-muted-foreground font-normal'
                             )}
                         >
-                            <span>{accountName || 'Select account'}</span>
+                            {accountName ? <AccountOption name={accountName} /> : <span>Select account</span>}
                             <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform shrink-0', accountOpen && 'rotate-180')} />
                         </button>
 
@@ -165,7 +166,7 @@ export default function AddTransaction() {
                                                 : 'text-foreground hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
                                         )}
                                     >
-                                        {opt}
+                                        <AccountOption name={opt} />
                                     </button>
                                 ))}
                             </div>

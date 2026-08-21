@@ -146,7 +146,7 @@ export default function AccountDetails() {
                             const isIn = item.type === 'IN';
                             return (
                                 <div key={item.id}>
-                                    <div className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/2 transition-colors">
+                                    <div className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className={cn(
                                                 'size-9 rounded-full flex items-center justify-center flex-shrink-0 border',
