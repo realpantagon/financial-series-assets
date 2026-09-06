@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:mock": "vite build --mode mock && vite preview"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
