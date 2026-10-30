@@ -14,12 +14,18 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      workbox: { navigateFallbackDenylist: [/^\/api\//] },
       manifest: {
         name: 'Pan Assets',
         short_name: 'PanAssets',
         description: 'Financial Asset Management',
-        theme_color: '#001f3f',
+        theme_color: '#121316',
+        background_color: '#121316',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        lang: 'th',
         icons: [
           {
             src: 'pwa-192x192.png',

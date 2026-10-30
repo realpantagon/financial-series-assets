@@ -1,4 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
+import { Chips } from '@/components/ios';
 import { useNavigate } from 'react-router-dom';
 import type { DimeTransaction } from '../types';
 import { cn } from '@/lib/utils';
@@ -58,10 +59,10 @@ const monthLabel = (m: string) => {
 
 function SC({ label, value, sub, cls }: { label: string; value: React.ReactNode; sub?: string; cls?: string }) {
     return (
-        <div className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
-            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">{label}</p>
-            <p className={cn('font-mono font-black text-sm leading-snug', cls)}>{value}</p>
-            {sub && <p className="text-[9px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
+        <div className="bg-card border border-border/20 p-3 rounded-xl">
+            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-0.5">{label}</p>
+            <p className={cn('font-mono font-semibold text-sm leading-snug', cls)}>{value}</p>
+            {sub && <p className="text-[11px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
         </div>
     );
 }
@@ -69,7 +70,7 @@ function SC({ label, value, sub, cls }: { label: string; value: React.ReactNode;
 function SectionHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
     return (
         <button onClick={onToggle} className="w-full flex items-center justify-between py-2 px-0 group">
-            <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.16em]">{title}</span>
+            <span className="text-[11px] font-semibold text-muted-foreground/50">{title}</span>
             <ChevronDown className={cn('size-3.5 text-muted-foreground/30 transition-transform group-hover:text-muted-foreground/60', open && 'rotate-180')} />
         </button>
     );
@@ -78,7 +79,7 @@ function SectionHeader({ title, open, onToggle }: { title: string; open: boolean
 function ChartTip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+        <div className="bg-card border border-border/30 px-2.5 py-2 text-xs font-mono shadow-lg rounded-xl">
             <p className="text-muted-foreground/60 mb-1">{label}</p>
             {payload.map((p: any, i: number) => (
                 <p key={i} style={{ color: p.color ?? p.fill ?? '#94a3b8' }}>
@@ -269,11 +270,11 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
     const maxLoss = Math.abs(topLosers[0]?.realizedPL ?? 0);
 
     const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
-        { key: 'all', label: 'ALL' },
-        { key: 'open', label: 'OPEN' },
-        { key: 'closed', label: 'CLOSED' },
-        { key: 'profit', label: 'PROFIT' },
-        { key: 'loss', label: 'LOSS' },
+        { key: 'all', label: 'All' },
+        { key: 'open', label: 'Open' },
+        { key: 'closed', label: 'Closed' },
+        { key: 'profit', label: 'Profit' },
+        { key: 'loss', label: 'Loss' },
     ];
 
     const SORTS: { key: SortKey; label: string }[] = [
@@ -343,20 +344,20 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {(overall.best || overall.worst) && (
                         <div className="grid grid-cols-2 gap-2">
                             {overall.best && (
-                                <div className="bg-emerald-500/6 border border-emerald-500/20 p-3">
-                                    <p className="text-[8px] font-bold text-emerald-400/60 uppercase tracking-[0.14em] flex items-center gap-1">
+                                <div className="bg-emerald-500/6 border border-emerald-500/20 p-3 rounded-xl">
+                                    <p className="text-[11px] font-semibold text-emerald-400/60 flex items-center gap-1">
                                         <Trophy className="size-2.5" /> Best Winner
                                     </p>
-                                    <p className="font-mono font-black text-sm text-emerald-400 mt-0.5">{overall.best.symbol}</p>
+                                    <p className="font-mono font-semibold text-sm text-emerald-400 mt-0.5">{overall.best.symbol}</p>
                                     <p className="font-mono text-xs text-emerald-400/70">+{d$(overall.best.realizedPL)}</p>
                                 </div>
                             )}
                             {overall.worst && (
-                                <div className="bg-rose-500/6 border border-rose-500/20 p-3">
-                                    <p className="text-[8px] font-bold text-rose-400/60 uppercase tracking-[0.14em] flex items-center gap-1">
+                                <div className="bg-rose-500/6 border border-rose-500/20 p-3 rounded-xl">
+                                    <p className="text-[11px] font-semibold text-rose-400/60 flex items-center gap-1">
                                         <TrendingDown className="size-2.5" /> Worst Loser
                                     </p>
-                                    <p className="font-mono font-black text-sm text-rose-400 mt-0.5">{overall.worst.symbol}</p>
+                                    <p className="font-mono font-semibold text-sm text-rose-400 mt-0.5">{overall.worst.symbol}</p>
                                     <p className="font-mono text-xs text-rose-400/70">{d$(overall.worst.realizedPL)}</p>
                                 </div>
                             )}
@@ -371,9 +372,9 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                             { label: 'Holding', value: overall.openCount, cls: 'text-cyan-300' },
                             { label: 'Closed', value: overall.closedCount, cls: 'text-muted-foreground/60' },
                         ].map(({ label, value, cls }) => (
-                            <div key={label} className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-2 text-center">
-                                <p className={cn('font-mono font-black text-xl', cls)}>{value}</p>
-                                <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest mt-0.5">{label}</p>
+                            <div key={label} className="bg-card border border-border/20 p-2 text-center rounded-xl">
+                                <p className={cn('font-mono font-semibold text-xl', cls)}>{value}</p>
+                                <p className="text-[11px] font-semibold text-muted-foreground/40 mt-0.5">{label}</p>
                             </div>
                         ))}
                     </div>
@@ -394,7 +395,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Search symbol…"
-                            className="w-full h-8 pl-7 pr-8 text-xs font-mono bg-black/20 border border-border/25 text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-cyan-500/30"
+                            className="w-full h-8 pl-7 pr-8 text-xs font-mono bg-muted border border-border/25 text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-cyan-500/30 rounded-xl"
                         />
                         {search && (
                             <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -403,41 +404,27 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                         )}
                     </div>
 
-                    {/* Status filter chips */}
-                    <div className="flex gap-1.5 flex-wrap">
-                        {STATUS_FILTERS.map(f => (
-                            <button key={f.key} onClick={() => setStatusFilter(f.key)}
-                                className={cn(
-                                    'px-2.5 py-1 text-[9px] font-bold tracking-widest border transition-all',
-                                    statusFilter === f.key
-                                        ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                                        : 'bg-black/20 border-border/20 text-muted-foreground/50 hover:border-border/40'
-                                )}>
-                                {f.label}
-                            </button>
-                        ))}
-                        <div className="ml-auto flex items-center gap-1">
-                            <span className="text-[9px] text-muted-foreground/30">Sort:</span>
-                            {SORTS.map(s => (
-                                <button key={s.key} onClick={() => toggleSort(s.key)}
-                                    className={cn(
-                                        'px-2 py-1 text-[9px] font-bold border transition-all',
-                                        sortBy === s.key
-                                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
-                                            : 'bg-black/20 border-border/15 text-muted-foreground/40 hover:border-border/30'
-                                    )}>
-                                    {s.label}{sortBy === s.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    {/* Status filter + sort */}
+                    <Chips
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={STATUS_FILTERS.map(f => ({ value: f.key, label: f.label }))}
+                    />
+                    <Chips
+                        value={sortBy}
+                        onChange={toggleSort}
+                        options={SORTS.map(s => ({
+                            value: s.key,
+                            label: <>{s.label}{sortBy === s.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}</>,
+                        }))}
+                    />
 
-                    <p className="text-[9px] text-muted-foreground/30 font-mono">{filtered.length} symbols</p>
+                    <p className="text-[11px] text-muted-foreground/30 font-mono">{filtered.length} symbols</p>
 
                     {/* Symbol rows */}
-                    <div className="flex flex-col border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)]">
+                    <div className="flex flex-col border border-border/20 bg-card rounded-xl">
                         {filtered.length === 0 ? (
-                            <div className="py-10 text-center text-[10px] text-muted-foreground/30 tracking-wider">NO SYMBOLS FOUND</div>
+                            <div className="py-10 text-center text-xs text-muted-foreground/30">No symbols found</div>
                         ) : filtered.map(s => {
                             const isExpanded = expandedSym === s.symbol;
                             const plPos = s.realizedPL >= 0;
@@ -450,17 +437,17 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         {/* Symbol + status */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-mono font-black text-sm text-foreground">{s.symbol}</span>
+                                                <span className="font-mono font-semibold text-sm text-foreground">{s.symbol}</span>
                                                 <span className={cn(
-                                                    'text-[8px] px-1.5 py-0.5 font-bold tracking-widest border',
+                                                    'text-[11px] px-1.5 py-0.5 font-semibold  border',
                                                     s.isClosed
                                                         ? 'bg-muted/10 border-border/20 text-muted-foreground/50'
                                                         : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
                                                 )}>
-                                                    {s.isClosed ? 'CLOSED' : 'OPEN'}
+                                                    {s.isClosed ? 'Closed' : 'Open'}
                                                 </span>
                                             </div>
-                                            <div className="text-[9px] font-mono text-muted-foreground/40 mt-0.5">
+                                            <div className="text-[11px] font-mono text-muted-foreground/40 mt-0.5">
                                                 {s.numTrades}T · {fmtDate(s.firstBuyDate)}
                                                 {!s.isClosed && ` · ${s.holdingDays}d`}
                                             </div>
@@ -470,15 +457,15 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         <div className="text-right shrink-0">
                                             {s.hasSells ? (
                                                 <>
-                                                    <p className={cn('font-mono font-black text-sm', plPos ? 'text-emerald-400' : 'text-rose-400')}>
+                                                    <p className={cn('font-mono font-semibold text-sm', plPos ? 'text-emerald-400' : 'text-rose-400')}>
                                                         {plPos ? '+' : ''}{d$(s.realizedPL)}
                                                     </p>
-                                                    <p className={cn('text-[9px] font-mono', plPos ? 'text-emerald-400/60' : 'text-rose-400/60')}>
+                                                    <p className={cn('text-[11px] font-mono', plPos ? 'text-emerald-400/60' : 'text-rose-400/60')}>
                                                         {pctFmt(s.realizedPLPct)}
                                                     </p>
                                                 </>
                                             ) : (
-                                                <p className="text-[9px] font-mono text-muted-foreground/30">No sells</p>
+                                                <p className="text-[11px] font-mono text-muted-foreground/30">No sells</p>
                                             )}
                                         </div>
                                         <ChevronRight className="size-3.5 text-muted-foreground/20 shrink-0" />
@@ -486,8 +473,8 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
 
                                     {/* Expanded details */}
                                     {isExpanded && (
-                                        <div className="px-3 pb-3 border-t border-border/15 bg-black/10">
-                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-3 text-[10px] font-mono">
+                                        <div className="px-3 pb-3 border-t border-border/15 bg-muted">
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-3 text-xs font-mono">
                                                 {[
                                                     ['Holding Shares', s.holdingShares > 0 ? s.holdingShares.toFixed(7) + ' sh' : '—'],
                                                     ['Cost Basis Remaining', d$(s.costBasisRemaining)],
@@ -505,7 +492,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                                     ['# Trades', s.numTrades.toString()],
                                                 ].map(([label, value]) => (
                                                     <div key={label}>
-                                                        <p className="text-[8px] text-muted-foreground/40 uppercase tracking-[0.1em] mb-0.5">{label}</p>
+                                                        <p className="text-[11px] text-muted-foreground/40 mb-0.5">{label}</p>
                                                         <p className="text-foreground/80">{value}</p>
                                                     </div>
                                                 ))}
@@ -523,7 +510,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
             <div className="border-b border-border/15">
                 <button onClick={() => setShowCharts(v => !v)}
                     className="w-full flex items-center justify-between py-2 group">
-                    <span className="flex items-center gap-2 text-[9px] font-bold text-muted-foreground/50 uppercase tracking-[0.16em]">
+                    <span className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground/50">
                         <BarChart2 className="size-3.5" />
                         Charts & Views
                     </span>
@@ -537,7 +524,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Monthly P&L */}
                     {monthlyData.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Monthly Realized P&L</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Monthly Realized P&L</p>
                             <ResponsiveContainer width="100%" height={160}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={{ ...AXIS_TICK, fontSize: 8 }} interval="preserveStartEnd" />
@@ -557,7 +544,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Cumulative P&L */}
                     {monthlyData.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Cumulative Realized P&L</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Cumulative Realized P&L</p>
                             <ResponsiveContainer width="100%" height={160}>
                                 <LineChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={{ ...AXIS_TICK, fontSize: 8 }} interval="preserveStartEnd" />
@@ -573,7 +560,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Yearly P&L */}
                     {yearlyData.length > 1 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Yearly Realized P&L</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Yearly Realized P&L</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <BarChart data={yearlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="year" tick={AXIS_TICK} />
@@ -593,7 +580,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Buy vs Sell by Month */}
                     {monthlyData.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Buy vs Sell by Month</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Buy vs Sell by Month</p>
                             <ResponsiveContainer width="100%" height={160}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={{ ...AXIS_TICK, fontSize: 8 }} interval="preserveStartEnd" />
@@ -609,7 +596,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Fee by Month */}
                     {monthlyData.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Fee by Month</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Fee by Month</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={{ ...AXIS_TICK, fontSize: 8 }} interval="preserveStartEnd" />
@@ -624,7 +611,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Trade Count by Month */}
                     {monthlyData.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Trade Count by Month</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Trade Count by Month</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={{ ...AXIS_TICK, fontSize: 8 }} interval="preserveStartEnd" />
@@ -641,13 +628,13 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                         <div className="grid grid-cols-2 gap-3">
                             {topWinners.length > 0 && (
                                 <div>
-                                    <p className="text-[8px] font-bold text-emerald-400/50 uppercase tracking-[0.16em] mb-2">Top Winners</p>
+                                    <p className="text-[11px] font-semibold text-emerald-400/50 mb-2">Top Winners</p>
                                     <div className="flex flex-col gap-1.5">
                                         {topWinners.map(s => (
                                             <div key={s.symbol}>
                                                 <div className="flex items-center justify-between mb-0.5">
-                                                    <span className="text-[10px] font-mono font-black text-foreground">{s.symbol}</span>
-                                                    <span className="text-[9px] font-mono text-emerald-400">+{d$(s.realizedPL)}</span>
+                                                    <span className="text-xs font-mono font-semibold text-foreground">{s.symbol}</span>
+                                                    <span className="text-[11px] font-mono text-emerald-400">+{d$(s.realizedPL)}</span>
                                                 </div>
                                                 <div className="h-1 bg-border/15 rounded-full overflow-hidden">
                                                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(s.realizedPL / maxWin) * 100}%` }} />
@@ -659,13 +646,13 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                             )}
                             {topLosers.length > 0 && (
                                 <div>
-                                    <p className="text-[8px] font-bold text-rose-400/50 uppercase tracking-[0.16em] mb-2">Top Losers</p>
+                                    <p className="text-[11px] font-semibold text-rose-400/50 mb-2">Top Losers</p>
                                     <div className="flex flex-col gap-1.5">
                                         {topLosers.map(s => (
                                             <div key={s.symbol}>
                                                 <div className="flex items-center justify-between mb-0.5">
-                                                    <span className="text-[10px] font-mono font-black text-foreground">{s.symbol}</span>
-                                                    <span className="text-[9px] font-mono text-rose-400">{d$(s.realizedPL)}</span>
+                                                    <span className="text-xs font-mono font-semibold text-foreground">{s.symbol}</span>
+                                                    <span className="text-[11px] font-mono text-rose-400">{d$(s.realizedPL)}</span>
                                                 </div>
                                                 <div className="h-1 bg-border/15 rounded-full overflow-hidden">
                                                     <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(Math.abs(s.realizedPL) / maxLoss) * 100}%` }} />
@@ -681,7 +668,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* Win/Loss + Open/Closed pies */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-2 text-center">Profit / Loss</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-2 text-center">Profit / Loss</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <PieChart>
                                     <Pie data={[
@@ -692,13 +679,13 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         <Cell fill={PIE_COLORS.loss} />
                                     </Pie>
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
+                                        ? <div className="bg-card border border-border/30 px-2 py-1 text-xs font-mono rounded-xl">{payload[0].name}: {payload[0].value}</div>
                                         : null} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-2 text-center">Open / Closed</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-2 text-center">Open / Closed</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <PieChart>
                                     <Pie data={[
@@ -709,7 +696,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                         <Cell fill={PIE_COLORS.closed} />
                                     </Pie>
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">{payload[0].name}: {payload[0].value}</div>
+                                        ? <div className="bg-card border border-border/30 px-2 py-1 text-xs font-mono rounded-xl">{payload[0].name}: {payload[0].value}</div>
                                         : null} />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -719,7 +706,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                     {/* P&L Distribution (histogram-style) */}
                     {symbolStats.filter(s => s.hasSells).length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">P&L Distribution</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">P&L Distribution</p>
                             <ResponsiveContainer width="100%" height={120}>
                                 <BarChart
                                     data={(() => {
@@ -731,7 +718,7 @@ export default function DimeStockAnalytics({ transactions }: { transactions: Dim
                                     <XAxis dataKey="symbol" tick={{ ...AXIS_TICK, fontSize: 7 }} />
                                     <YAxis tick={AXIS_TICK} tickFormatter={v => `$${v.toFixed(0)}`} />
                                     <RCTip content={({ active, payload }) => active && payload?.length
-                                        ? <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2 py-1 text-[10px] font-mono">
+                                        ? <div className="bg-card border border-border/30 px-2 py-1 text-xs font-mono rounded-xl">
                                             <p className="text-muted-foreground/60">{payload[0].payload.symbol}</p>
                                             <p style={{ color: (payload[0].value as number) >= 0 ? '#34d399' : '#f87171' }}>{d$(payload[0].value as number)}</p>
                                           </div>

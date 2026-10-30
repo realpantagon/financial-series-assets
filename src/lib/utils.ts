@@ -11,3 +11,11 @@ export function getErrorMessage(err: unknown): string {
   if (typeof err === "string") return err
   return "Unexpected error"
 }
+
+/** ฿1,234.50 — the sign leads the symbol, so negatives read -฿1,234.50. */
+export function fmtTHB(value: number, opts: { sign?: boolean; decimals?: number } = {}): string {
+  const d = opts.decimals ?? 2
+  const abs = Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })
+  const sign = value < 0 ? "-" : opts.sign && value > 0 ? "+" : ""
+  return `${sign}฿ ${abs}`
+}

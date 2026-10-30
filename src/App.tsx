@@ -1,13 +1,12 @@
-import { lazy, Suspense, useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, History, ArrowLeftRight, TrendingUp, Landmark, Sun, Moon } from 'lucide-react';
+import { Wallet, History, ArrowLeftRight, CandlestickChart, Landmark, Sun, Moon, ChevronLeft } from 'lucide-react';
 
-// Lazy-load all routes — keeps initial bundle small (especially the FCD page
-// which pulls in tesseract.js + recharts).
+// Lazy-load all routes — keeps initial bundle small (the FCD page pulls in tesseract.js + recharts).
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const AddTransaction = lazy(() => import('@/pages/AddTransaction'));
 const AccountDetails = lazy(() => import('@/pages/AccountDetails'));
@@ -24,130 +23,166 @@ const DimeStockYearly = lazy(() => import('@/pages/DimeStockYearly'));
 
 function RouteFallback() {
     return (
-        <div className="flex flex-col gap-3 pt-4 pb-20">
-            <Skeleton className="h-28 w-full rounded-xl" />
-            <div className="flex flex-col gap-2">
-                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
-            </div>
+        <div className="flex flex-col gap-3 pt-2">
+            <Skeleton className="h-32 w-full rounded-3xl" />
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
         </div>
     );
 }
 
-// ─── Nav item ─────────────────────────────────────────────────────────────────
+// ─── Route metadata ───────────────────────────────────────────────────────────
+// Top-level routes are the five tabs; everything else is a drill-down with a Back chevron.
 
-function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
-    const location = useLocation();
-    // Stocks sub-pages should keep Stocks tab active
-    const isActive = to === '/'
-        ? location.pathname === '/'
-        : location.pathname.startsWith(to);
+const TABS = [
+    { to: '/', label: 'Home', icon: Wallet },
+    { to: '/transactions', label: 'History', icon: History },
+    { to: '/fx', label: 'FX', icon: ArrowLeftRight },
+    { to: '/dime-stock', label: 'Stocks', icon: CandlestickChart },
+    { to: '/fcd', label: 'FCD', icon: Landmark },
+] as const;
 
-    return (
-        <Link
-            to={to}
-            className={cn(
-                'relative flex flex-col items-center justify-center gap-1 w-full py-2 transition-all duration-150',
-                isActive ? 'text-cyan-400' : 'text-muted-foreground/50 hover:text-muted-foreground'
-            )}
-        >
-            {/* Active glow dot */}
-            {isActive && (
-                <span className="absolute top-0 inset-x-0 mx-auto w-8 h-px bg-gradient-to-r from-transparent via-cyan-400/80 to-transparent" />
-            )}
-            <Icon
-                className={cn('size-[18px]', isActive ? 'stroke-[2]' : 'stroke-[1.5]')}
-            />
-            <span className={cn(
-                'text-[8px] uppercase tracking-[0.12em]',
-                isActive ? 'font-bold text-cyan-400' : 'font-medium'
-            )}>
-                {label}
-            </span>
-        </Link>
-    );
+const TITLES: Record<string, string> = {
+    '/': 'Pan Assets',
+    '/transactions': 'History',
+    '/fx': 'FX Exchange',
+    '/fx/analytics': 'FX Analytics',
+    '/dime-stock': 'Stocks',
+    '/dime-stock-add': 'Add Trade',
+    '/dime-stock/yearly': 'Yearly Summary',
+    '/fcd': 'FCD',
+    '/salary': 'Salary Allocation',
+    '/transfer': 'Transfer',
+    '/add': 'New Transaction',
+};
+
+function useRouteMeta() {
+    const { pathname } = useLocation();
+    const isTab = TABS.some(t => t.to === pathname);
+    let title = TITLES[pathname];
+    if (!title) {
+        const seg = decodeURIComponent(pathname.split('/').pop() ?? '');
+        title = seg || 'Pan Assets';
+    }
+    return { pathname, title, isTab };
 }
 
-// ─── Bottom nav ───────────────────────────────────────────────────────────────
+// ─── Top bar ──────────────────────────────────────────────────────────────────
 
-function BottomNav() {
-    return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-bottom">
-            <div className="mx-auto max-w-lg border-t border-border/30 bg-card/95 dark:bg-[oklch(0.09_0.012_255/0.95)] backdrop-blur-md">
-                <div className="grid grid-cols-5 h-[72px] items-center pb-8">
-                    <NavItem to="/" label="Home" icon={LayoutDashboard} />
-                    <NavItem to="/transactions" label="History" icon={History} />
-                    <NavItem to="/fx" label="FX" icon={ArrowLeftRight} />
-                    <NavItem to="/dime-stock" label="Stocks" icon={TrendingUp} />
-                    <NavItem to="/fcd" label="FCD" icon={Landmark} />
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── Header ───────────────────────────────────────────────────────────────────
-
-function Header() {
-    const [isDark, setIsDark] = useState(
-        () => document.documentElement.classList.contains('dark')
-    );
-
-    function toggleTheme() {
+function useTheme() {
+    const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+    const toggle = () => {
         const next = isDark ? 'light' : 'dark';
         const html = document.documentElement;
         html.classList.remove('dark', 'light');
         html.classList.add(next);
-        localStorage.setItem('panassets-theme', next);
+        try { localStorage.setItem('panassets-theme', next); } catch { /* private mode */ }
         const meta = document.getElementById('theme-color-meta') as HTMLMetaElement | null;
-        if (meta) meta.content = next === 'dark' ? '#0a0a0f' : '#f6f7fb';
+        if (meta) meta.content = next === 'dark' ? '#121316' : '#f2f3f6';
         setIsDark(!isDark);
-    }
+    };
+    return { isDark, toggle };
+}
+
+function TopBar() {
+    const navigate = useNavigate();
+    const { title, isTab, pathname } = useRouteMeta();
+    const { isDark, toggle } = useTheme();
+    const isHome = pathname === '/';
 
     return (
-        <div className="sticky top-0 z-40 border-b border-border/25 bg-card/90 dark:bg-[oklch(0.09_0.012_255/0.92)] backdrop-blur-md">
-            <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
-                {/* Logo */}
-                <div className="flex items-center gap-2">
-                    <div className="size-5 rounded bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-                        <TrendingUp className="size-3 text-cyan-400" strokeWidth={2.5} />
-                    </div>
-                    <span className="text-sm font-black text-foreground tracking-tight">
-                        Pan<span className="text-cyan-400">Assets</span>
-                    </span>
+        <header className="shrink-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl safe-top">
+            <div className="h-12 px-2 flex items-center">
+                <div className="w-20 flex items-center">
+                    {!isTab && (
+                        <button
+                            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+                            className="press flex items-center -ml-0.5 pr-3 h-11 text-primary text-[17px]"
+                            aria-label="Back"
+                        >
+                            <ChevronLeft className="size-7" strokeWidth={2.25} />
+                            <span className="-ml-1">Back</span>
+                        </button>
+                    )}
                 </div>
-                {/* Right side */}
-                <div className="flex items-center gap-3">
-                    {/* Theme toggle */}
-                    <button
-                        onClick={toggleTheme}
-                        className="flex items-center justify-center size-7 rounded-md border border-border/40 text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors"
-                        aria-label="Toggle theme"
-                    >
-                        {isDark
-                            ? <Sun className="size-3.5" strokeWidth={2} />
-                            : <Moon className="size-3.5" strokeWidth={2} />
-                        }
-                    </button>
-                    {/* Status */}
-                    <div className="flex items-center gap-1.5">
-                        <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
-                    </div>
+                <h1 className={cn(
+                    'flex-1 text-center truncate text-[17px] font-semibold tracking-tight',
+                    isHome && 'text-primary'
+                )}>
+                    {title}
+                </h1>
+                <div className="w-20 flex justify-end">
+                    {isTab && (
+                        <button
+                            onClick={toggle}
+                            className="press size-11 flex items-center justify-center rounded-full text-muted-foreground"
+                            aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+                        >
+                            {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+                        </button>
+                    )}
                 </div>
             </div>
-        </div>
+        </header>
     );
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
+// ─── Tab bar ──────────────────────────────────────────────────────────────────
+
+function TabBar() {
+    const { pathname } = useLocation();
+    return (
+        <nav className="shrink-0 z-50 border-t border-border/60 bg-card/85 backdrop-blur-xl safe-bottom" aria-label="Main">
+            <div className="grid grid-cols-5 h-[52px]">
+                {TABS.map(({ to, label, icon: Icon }) => {
+                    // Drill-down pages keep their parent tab lit.
+                    const active = to === '/'
+                        ? pathname === '/' || pathname.startsWith('/account') || pathname === '/salary' || pathname === '/transfer' || pathname === '/add'
+                        : pathname === to || pathname.startsWith(to + '/') || (to === '/dime-stock' && pathname.startsWith('/dime-stock'));
+                    return (
+                        <NavLink
+                            key={to}
+                            to={to}
+                            className={cn(
+                                'press flex flex-col items-center justify-center gap-0.5',
+                                active ? 'text-primary' : 'text-muted-foreground'
+                            )}
+                            aria-current={active ? 'page' : undefined}
+                        >
+                            <Icon className="size-6" strokeWidth={active ? 2.25 : 1.75} />
+                            <span className={cn('text-[11px] leading-none', active ? 'font-semibold' : 'font-medium')}>{label}</span>
+                        </NavLink>
+                    );
+                })}
+            </div>
+        </nav>
+    );
+}
+
+// ─── Scroll container: resets to top on navigation ────────────────────────────
+
+function Content({ children }: { children: React.ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const { pathname } = useLocation();
+    useEffect(() => { ref.current?.scrollTo({ top: 0 }); }, [pathname]);
+    return (
+        <main ref={ref} className="flex-1 min-h-0 scroll-y">
+            <div className="mx-auto w-full max-w-[430px] px-4 pt-4 pb-10">{children}</div>
+        </main>
+    );
+}
+
+function AccountRoute() {
+    const { accountName } = useParams();
+    return <AccountDetails key={accountName} />;
+}
 
 function App() {
     return (
         <ErrorBoundary>
             <BrowserRouter>
-                <div className="min-h-screen flex flex-col bg-background">
-                    <Header />
-                    <div className="flex-1 w-full max-w-lg mx-auto px-3 pb-28">
+                <div className="h-dvh flex flex-col bg-background">
+                    <TopBar />
+                    <Content>
                         <Suspense fallback={<RouteFallback />}>
                             <Routes>
                                 <Route path="/" element={<Dashboard />} />
@@ -159,24 +194,19 @@ function App() {
                                 <Route path="/dime-stock-add" element={<AddTradePage />} />
                                 <Route path="/dime-stock/yearly" element={<DimeStockYearly />} />
                                 <Route path="/dime-stock/:symbol" element={<SymbolDetailPage />} />
-                                <Route path="/account/:accountName" element={<AccountDetails />} />
+                                <Route path="/account/:accountName" element={<AccountRoute />} />
                                 <Route path="/fcd" element={<FCDDashboard />} />
                                 <Route path="/salary" element={<SalaryAllocation />} />
                                 <Route path="/transfer" element={<AddTransfer />} />
                             </Routes>
                         </Suspense>
-                    </div>
-                    <BottomNav />
+                    </Content>
+                    <TabBar />
                     <Toaster
                         position="top-center"
                         richColors
-                        toastOptions={{
-                            style: {
-                                fontFamily: "'JetBrains Mono', monospace",
-                                fontSize: '12px',
-                                letterSpacing: '0.02em',
-                            },
-                        }}
+                        offset={`calc(env(safe-area-inset-top, 0px) + 8px)`}
+                        toastOptions={{ style: { fontSize: '14px' } }}
                     />
                 </div>
             </BrowserRouter>

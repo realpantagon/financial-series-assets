@@ -6,6 +6,12 @@ export default {
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
+        // shadcn's generated components use bare data-* variants (data-open, data-active…)
+        data: {
+            open: 'state~="open"', closed: 'state~="closed"', active: 'state~="active"',
+            vertical: 'orientation~="vertical"', horizontal: 'orientation~="horizontal"',
+            disabled: 'disabled', placeholder: 'placeholder',
+        },
         extend: {
             colors: {
                 // shadcn CSS variable mappings
@@ -44,15 +50,24 @@ export default {
                 // Custom financial colors (raw values for direct use)
                 success: '#43a047',
                 danger: '#d81b60',
+                // Legacy "cyan" accent remapped to the blue brand token
+                cyan: {
+                    200: 'oklch(var(--brand) / <alpha-value>)',
+                    300: 'oklch(var(--brand) / <alpha-value>)',
+                    400: 'oklch(var(--brand) / <alpha-value>)',
+                    500: 'oklch(var(--brand) / <alpha-value>)',
+                    600: 'oklch(var(--brand) / <alpha-value>)',
+                },
             },
             borderRadius: {
+                '4xl': '2rem',
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',
                 sm: 'calc(var(--radius) - 4px)',
             },
             fontFamily: {
-                sans: ['JetBrains Mono', 'monospace'],
-                mono: ['JetBrains Mono', 'monospace'],
+                sans: ['IBM Plex Sans Thai', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                mono: ['IBM Plex Sans Thai', 'ui-sans-serif', 'system-ui', 'sans-serif'],
             },
         },
     },

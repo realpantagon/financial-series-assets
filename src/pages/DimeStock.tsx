@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Chips } from '@/components/ios';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
     Plus, TrendingUp, TrendingDown, ChevronRight, ChevronDown,
-    Inbox, Activity, Check, Filter, BarChart2, CalendarDays
+    Inbox, Activity, BarChart2, CalendarDays
 } from 'lucide-react';
 import DimeStockAnalytics from './DimeStockAnalytics';
 
@@ -43,21 +47,13 @@ type PortfolioSort = 'position' | 'pl' | 'pl_pct' | 'symbol' | 'trades' | 'inves
 // ─── SidePill ─────────────────────────────────────────────────────────────────
 
 function SidePill({ side }: { side: string }) {
-    return (
-        <span className={cn(
-            'inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border tracking-wider',
-            side === 'BUY'  ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25' :
-                              'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-        )}>
-            {side}
-        </span>
-    );
+    return <Badge variant={side === 'BUY' ? 'info' : 'success'}>{side === 'BUY' ? 'Buy' : side === 'SELL' ? 'Sell' : side}</Badge>;
 }
 
 function FeePill({ label, value }: { label: string; value: number | null | undefined }) {
     if (!value || value <= 0) return null;
     return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/6 text-amber-400/70 border border-amber-500/12">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-xl text-[11px] font-mono bg-amber-500/6 text-amber-400/70 border border-amber-500/12">
             {label} {fmt(value, 4)}
         </span>
     );
@@ -80,18 +76,18 @@ function TradeRow({ tx }: { tx: DimeTransaction }) {
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-black text-sm text-foreground">{tx.symbol}</span>
+                        <span className="font-mono font-semibold text-sm text-foreground">{tx.symbol}</span>
                         <SidePill side={tx.side} />
-                        <span className="text-[9px] text-muted-foreground/50 font-mono">{formatDate(tx.trade_date)}</span>
+                        <span className="text-[11px] text-muted-foreground/50 font-mono">{formatDate(tx.trade_date)}</span>
                     </div>
-                    <span className={cn('font-mono font-bold text-sm shrink-0',
+                    <span className={cn('font-mono font-semibold text-sm shrink-0',
                         isBuy ? 'text-foreground' : 'text-emerald-400'
                     )}>
                         {fmt(displayAmount)}
                     </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                    <span className="text-[9px] font-mono text-muted-foreground/50">
+                    <span className="text-[11px] font-mono text-muted-foreground/50">
                         {Number(tx.qty).toFixed(7)} sh @ {fmt(tx.price)}
                     </span>
                     <FeePill label="fee" value={tx.fee_usd} />
@@ -113,11 +109,11 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
     return (
         <button
             onClick={onClick}
-            className="w-full text-left border border-border/25 rounded-xl bg-card hover:border-cyan-500/20 hover:shadow-[0_0_20px_oklch(0.68_0.18_210/0.06)] transition-all duration-200 active:scale-[0.99] overflow-hidden group"
+            className="w-full text-left rounded-2xl bg-card hover:border-cyan-500/20 hover:shadow-[0_0_20px_oklch(0.68_0.18_210/0.06)] transition-all duration-200 active:scale-[0.99] overflow-hidden group"
         >
             <div className={cn('h-px w-full', hasPosition
-                ? 'bg-gradient-to-r from-cyan-500/50 to-transparent'
-                : 'bg-gradient-to-r from-emerald-500/30 to-transparent'
+                ? 'bg-primary/20'
+                : 'bg-primary/20'
             )} />
 
             <div className="p-4">
@@ -125,26 +121,26 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                 <div className="flex items-start justify-between mb-3">
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-mono font-black text-lg text-foreground tracking-tighter">{s.symbol}</span>
-                            <span className="text-[9px] text-muted-foreground/40 font-mono">{s.txCount}T</span>
+                            <span className="font-mono font-semibold text-lg text-foreground er">{s.symbol}</span>
+                            <span className="text-[11px] text-muted-foreground/40 font-mono">{s.txCount}T</span>
                             {isClosed && (
-                                <span className="text-[8px] px-1.5 py-0.5 font-bold tracking-widest border bg-muted/10 border-border/20 text-muted-foreground/40">
-                                    CLOSED
+                                <span className="text-[11px] px-1.5 py-0.5 font-semibold border bg-muted/10 border-border/20 text-muted-foreground/40 rounded-xl">
+                                    Closed
                                 </span>
                             )}
                         </div>
-                        <span className="text-[9px] text-muted-foreground/30 font-mono">{formatDate(s.latestDate)}</span>
+                        <span className="text-[11px] text-muted-foreground/30 font-mono">{formatDate(s.latestDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         {hasSold && (
                             <div className="text-right">
-                                <div className={cn('flex items-center gap-1 text-xs font-mono font-bold justify-end',
+                                <div className={cn('flex items-center gap-1 text-xs font-mono font-semibold justify-end',
                                     plPositive ? 'text-emerald-400' : 'text-rose-400'
                                 )}>
                                     {plPositive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
                                     {plPositive ? '+' : ''}{fmt(s.realizedPL)}
                                 </div>
-                                <div className={cn('text-[9px] font-mono mt-0.5',
+                                <div className={cn('text-[11px] font-mono mt-0.5',
                                     plPositive ? 'text-emerald-400/60' : 'text-rose-400/60'
                                 )}>
                                     {plPositive ? '+' : ''}{s.realizedPLPct.toFixed(1)}%
@@ -158,32 +154,32 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                 {/* Position size */}
                 {hasPosition && (
                     <div className="mb-3">
-                        <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">Position</p>
-                        <p className="font-mono font-black text-xl text-cyan-300 tracking-tight">{fmt(s.totalStockAmount)}</p>
-                        <p className="text-[9px] font-mono text-muted-foreground/40 mt-0.5">{s.totalShares.toFixed(6)} sh</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground/40 mb-0.5">Position</p>
+                        <p className="font-mono font-semibold text-xl text-cyan-300">{fmt(s.totalStockAmount)}</p>
+                        <p className="text-[11px] font-mono text-muted-foreground/40 mt-0.5">{s.totalShares.toFixed(6)} sh</p>
                     </div>
                 )}
 
                 {/* Realized P&L box */}
                 <div className={cn(
-                    'mb-3 border px-3 py-2 rounded-lg',
+                    'mb-3 border px-3 py-2 rounded-xl',
                     hasSold
                         ? plPositive
                             ? 'bg-emerald-500/6 border-emerald-500/15'
                             : 'bg-rose-500/6 border-rose-500/15'
-                        : 'bg-white/3 border-border/15'
+                        : 'bg-muted border-border/15'
                 )}>
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em]">Realized P&L</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground/35">Realized P&L</p>
                         <div className="text-right">
                             <p className={cn(
-                                'font-mono font-black text-sm',
+                                'font-mono font-semibold text-sm',
                                 !hasSold ? 'text-muted-foreground/35' : plPositive ? 'text-emerald-400' : 'text-rose-400'
                             )}>
                                 {hasSold && plPositive ? '+' : ''}{fmt(hasSold ? s.realizedPL : 0)}
                             </p>
                             {hasSold && (
-                                <p className={cn('text-[9px] font-mono', plPositive ? 'text-emerald-400/50' : 'text-rose-400/50')}>
+                                <p className={cn('text-[11px] font-mono', plPositive ? 'text-emerald-400/50' : 'text-rose-400/50')}>
                                     {plPositive ? '+' : ''}{s.realizedPLPct.toFixed(2)}%
                                 </p>
                             )}
@@ -194,18 +190,18 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                 {/* Stats row */}
                 <div className="flex items-center gap-4 pt-2.5 border-t border-border/15">
                     <div>
-                        <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Avg Cost</p>
-                        <p className="font-mono font-bold text-xs text-foreground/60">{fmt(s.avgBuyPrice)}</p>
+                        <p className="text-[11px] text-muted-foreground/30 mb-0.5">Avg Cost</p>
+                        <p className="font-mono font-semibold text-xs text-foreground/60">{fmt(s.avgBuyPrice)}</p>
                     </div>
                     {hasSold && (
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Sold</p>
-                            <p className="font-mono font-bold text-xs text-emerald-400/80">{fmt(s.totalSellAmount)}</p>
+                            <p className="text-[11px] text-muted-foreground/30 mb-0.5">Sold</p>
+                            <p className="font-mono font-semibold text-xs text-emerald-400/80">{fmt(s.totalSellAmount)}</p>
                         </div>
                     )}
                     <div className="ml-auto text-right">
-                        <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Invested</p>
-                        <p className="font-mono font-bold text-xs text-foreground/60">{fmt(s.totalBuyAmount)}</p>
+                        <p className="text-[11px] text-muted-foreground/30 mb-0.5">Invested</p>
+                        <p className="font-mono font-semibold text-xs text-foreground/60">{fmt(s.totalBuyAmount)}</p>
                     </div>
                 </div>
 
@@ -213,8 +209,8 @@ function PositionCard({ s, onClick }: { s: SymbolSummary; onClick: () => void })
                 {s.allocationPct > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-border/10">
                         <div className="flex items-center justify-between mb-1">
-                            <p className="text-[8px] text-muted-foreground/25 uppercase tracking-[0.12em]">Portfolio allocation</p>
-                            <p className="text-[9px] font-mono font-bold text-muted-foreground/40">{s.allocationPct.toFixed(1)}%</p>
+                            <p className="text-[11px] text-muted-foreground/25">Portfolio allocation</p>
+                            <p className="text-[11px] font-mono font-semibold text-muted-foreground/40">{s.allocationPct.toFixed(1)}%</p>
                         </div>
                         <div className="h-0.5 bg-border/15 rounded-full overflow-hidden">
                             <div
@@ -255,7 +251,7 @@ function PortfolioMap({ summaries, onSymbolClick }: {
         <div className="flex flex-col gap-2">
 
             {/* Allocation strip */}
-            <div className="h-3 flex rounded-sm overflow-hidden bg-black/30 gap-px">
+            <div className="h-3 flex rounded-xl overflow-hidden bg-muted gap-px">
                 {sorted.map(s => {
                     const hasSells = s.totalSellAmount > 0;
                     const plPos = s.realizedPL >= 0;
@@ -275,7 +271,7 @@ function PortfolioMap({ summaries, onSymbolClick }: {
             </div>
 
             {/* Sorted list */}
-            <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.10_0.013_255)] divide-y divide-border/[0.07]">
+            <div className="border border-border/20 bg-card divide-y divide-border/[0.07]">
                 {sorted.map((s, i) => {
                     const hasSells = s.totalSellAmount > 0;
                     const hasPos = s.totalShares > 0;
@@ -302,25 +298,25 @@ function PortfolioMap({ summaries, onSymbolClick }: {
                             onClick={() => onSymbolClick(s.symbol)}
                             className="w-full flex items-center gap-2 px-2.5 py-2 text-left active:bg-white/[0.04] hover:bg-white/[0.02] transition-colors">
 
-                            <span className="text-[8px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right leading-none">{i + 1}</span>
-                            <span className="font-mono font-black text-[11px] text-foreground w-[52px] shrink-0 truncate leading-none">{s.symbol}</span>
+                            <span className="text-[11px] font-mono text-muted-foreground/20 w-4 shrink-0 text-right leading-none">{i + 1}</span>
+                            <span className="font-mono font-semibold text-[11px] text-foreground w-[52px] shrink-0 truncate leading-none">{s.symbol}</span>
 
-                            <div className="flex-1 relative h-[22px] bg-black/20 overflow-hidden">
+                            <div className="flex-1 relative h-[22px] bg-muted overflow-hidden">
                                 <div className={cn('absolute inset-y-0 left-0', barBg)} style={{ width: barW }} />
                                 <div className="absolute inset-0 flex items-center px-1.5">
-                                    <span className={cn('text-[9px] font-mono font-bold leading-none', plColor)}>{barText}</span>
+                                    <span className={cn('text-[11px] font-mono font-semibold leading-none', plColor)}>{barText}</span>
                                 </div>
                             </div>
 
                             <div className="shrink-0 text-right w-16">
                                 {hasSells && (
-                                    <span className={cn('font-mono font-bold text-[10px] block leading-snug',
+                                    <span className={cn('font-mono font-semibold text-xs block leading-snug',
                                         s.realizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
                                     )}>
                                         {fmtCompact(s.realizedPL)}
                                     </span>
                                 )}
-                                <span className="text-[8px] font-mono text-muted-foreground/30 block leading-snug">
+                                <span className="text-[11px] font-mono text-muted-foreground/30 block leading-snug">
                                     {allocPct.toFixed(1)}%
                                 </span>
                             </div>
@@ -336,8 +332,8 @@ function PortfolioMap({ summaries, onSymbolClick }: {
                     { color: 'bg-rose-500/60',    label: 'Loss' },
                     { color: 'bg-cyan-500/40',    label: 'Holding' },
                 ].map(({ color, label }) => (
-                    <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
-                        <span className={cn('size-2 rounded-sm shrink-0', color)} />
+                    <span key={label} className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground/40">
+                        <span className={cn('size-2 rounded-xl shrink-0', color)} />
                         {label}
                     </span>
                 ))}
@@ -369,7 +365,7 @@ export default function DimeStock() {
     const fetchTransactions = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('dime_trades')
                 .select('*')
                 .eq('asset_class', 'STOCK')
@@ -490,8 +486,8 @@ export default function DimeStock() {
     if (loading) return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
             <Skeleton className="h-28 w-full rounded-xl" />
-            <div className="grid grid-cols-3 gap-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
-            <Skeleton className="h-9 w-full rounded-lg" />
+            <div className="grid grid-cols-3 gap-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+            <Skeleton className="h-9 w-full rounded-xl" />
             {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
     );
@@ -504,57 +500,50 @@ export default function DimeStock() {
             {/* ── Page header ── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="font-black text-lg text-foreground tracking-tighter">Dime Stocks</h1>
-                    <span className="text-[9px] text-muted-foreground/40 font-mono tracking-wider">
+                    <span className="text-[11px] text-muted-foreground/40 font-mono">
                         {transactions.length} tx · {symbolSummaries.length} sym
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => navigate('/dime-stock/yearly')}
-                        className="flex items-center justify-center gap-1.5 bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 text-muted-foreground/60 hover:text-foreground border border-border/20 hover:border-border/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
-                    >
-                        <CalendarDays className="size-3.5" />
-                        YEARLY
-                    </button>
-                    <button
-                        onClick={() => navigate('/dime-stock-add')}
-                        className="flex items-center justify-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/25 hover:border-cyan-400/40 px-3 h-9 rounded-none text-[10px] font-bold tracking-[0.1em] transition-all"
-                    >
-                        <Plus className="size-3.5" />
-                        ADD
-                    </button>
+                    <Button variant="secondary" onClick={() => navigate('/dime-stock/yearly')}>
+                        <CalendarDays data-icon="inline-start" />
+                        Yearly
+                    </Button>
+                    <Button onClick={() => navigate('/dime-stock-add')}>
+                        <Plus data-icon="inline-start" />
+                        Add
+                    </Button>
                 </div>
             </div>
 
             {/* ── Portfolio Hero ── */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
-                <Activity className="absolute -right-3 -top-3 size-20 text-cyan-500/4" />
-                <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
+            <div className="rounded-2xl bg-card p-5 relative overflow-hidden">
+                <Activity className="absolute -right-3 -top-3 size-20 text-cyan-500/5" />
+                <div className="h-px w-full absolute top-0 left-0 bg-primary/20" />
                 <div className="relative">
-                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-1">Realized Net P&L</p>
-                    <p className={cn('font-mono font-black text-3xl tracking-tight', netPL >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                    <p className="text-[11px] font-semibold text-muted-foreground/40 mb-1">Realized Net P&L</p>
+                    <p className={cn('font-mono font-semibold text-3xl ', netPL >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
                         {netPL >= 0 ? '+' : ''}{fmt(netPL)}
                     </p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3 pt-3 border-t border-border/15">
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Profit</p>
-                            <p className="font-mono text-xs font-bold text-emerald-400">+{fmt(realizedProfit)}</p>
+                            <p className="text-[11px] text-muted-foreground/30 mb-0.5">Profit</p>
+                            <p className="font-mono text-xs font-semibold text-emerald-400">+{fmt(realizedProfit)}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Loss</p>
-                            <p className="font-mono text-xs font-bold text-rose-400">{realizedLoss < 0 ? '-' : ''}{fmt(Math.abs(realizedLoss))}</p>
+                            <p className="text-[11px] text-muted-foreground/30 mb-0.5">Loss</p>
+                            <p className="font-mono text-xs font-semibold text-rose-400">{realizedLoss < 0 ? '-' : ''}{fmt(Math.abs(realizedLoss))}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Sold</p>
-                            <p className="font-mono text-xs font-bold text-emerald-400">{fmt(overallSell)}</p>
+                            <p className="text-[11px] text-muted-foreground/30 mb-0.5">Sold</p>
+                            <p className="font-mono text-xs font-semibold text-emerald-400">{fmt(overallSell)}</p>
                         </div>
                         <div>
-                            <p className="text-[8px] text-muted-foreground/30 uppercase tracking-wider mb-0.5">Invested</p>
-                            <p className="font-mono text-xs font-bold text-foreground">{fmt(overallBuy)}</p>
+                            <p className="text-[11px] text-muted-foreground/30 mb-0.5">Invested</p>
+                            <p className="font-mono text-xs font-semibold text-foreground">{fmt(overallBuy)}</p>
                         </div>
                     </div>
-                    <p className="mt-3 text-[9px] font-mono text-muted-foreground/35 tracking-wider">
+                    <p className="mt-3 text-[11px] font-mono text-muted-foreground/35">
                         {plSymbols} symbols with realized P&L
                     </p>
                 </div>
@@ -566,9 +555,9 @@ export default function DimeStock() {
                 className="w-full flex items-center gap-2 py-0.5 group"
             >
                 <div className="flex-1 h-px bg-border/15" />
-                <span className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em] group-hover:text-muted-foreground/60 transition-colors whitespace-nowrap">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors whitespace-nowrap">
                     <BarChart2 className="size-3" />
-                    PORTFOLIO MAP
+                    Portfolio map
                     <ChevronDown className={cn('size-3 transition-transform', showMap && 'rotate-180')} />
                 </span>
                 <div className="flex-1 h-px bg-border/15" />
@@ -585,91 +574,49 @@ export default function DimeStock() {
             <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
                     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
-                        <TabsList className="w-full grid grid-cols-3 h-9 bg-black/30 border border-border/20 p-0 rounded-none">
-                            <TabsTrigger value="portfolio" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none border-r border-border/20">
-                                PORTFOLIO
-                            </TabsTrigger>
-                            <TabsTrigger value="trades" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none border-r border-border/20">
-                                TRADES
-                            </TabsTrigger>
-                            <TabsTrigger value="stats" className="text-[10px] tracking-wider font-bold h-full data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-300 data-[state=active]:shadow-none rounded-none">
-                                STATS
-                            </TabsTrigger>
+                        <TabsList>
+                            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+                            <TabsTrigger value="trades">Trades</TabsTrigger>
+                            <TabsTrigger value="stats">Stats</TabsTrigger>
                         </TabsList>
                     </Tabs>
 
-                    <div className={cn('relative', activeTab === 'stats' && 'invisible pointer-events-none')}>
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setFilterOpen(!filterOpen); }}
-                            className={cn(
-                                "flex items-center gap-2 h-9 px-3 border transition-all rounded-none font-bold text-[10px] tracking-widest",
-                                symbolFilter ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300" : "bg-black/30 border-border/20 text-muted-foreground"
-                            )}
-                        >
-                            <Filter className="size-3" />
-                            {symbolFilter || 'ALL'}
-                            <ChevronDown className={cn("size-3 opacity-50", filterOpen && "rotate-180")} />
-                        </button>
-
-                        {filterOpen && (
-                            <div className="absolute right-0 top-[calc(100%+4px)] w-48 z-50 bg-slate-50 dark:bg-[oklch(0.12_0.02_250)] border border-border/30 shadow-2xl overflow-hidden max-h-60 flex flex-col">
-                                <button
-                                    onClick={() => setSymbolFilter('')}
-                                    className="px-3 py-2.5 text-left text-[10px] font-bold tracking-widest text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/5 border-b border-border/10 flex items-center gap-2"
-                                >
-                                    {!symbolFilter ? <Check className="size-3 text-cyan-400" /> : <div className="size-3" />}
-                                    ALL STOCKS
-                                </button>
-                                <div className="overflow-y-auto">
+                    <div className={cn(activeTab === 'stats' && 'invisible pointer-events-none')}>
+                        <Select value={symbolFilter || '__all'} onValueChange={(v) => setSymbolFilter(v === '__all' ? '' : v)}>
+                            <SelectTrigger className="h-11 min-w-28 rounded-xl" aria-label="Filter by stock">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="__all">All stocks</SelectItem>
                                     {symbolSummaries.map(s => (
-                                        <button
-                                            key={s.symbol}
-                                            onClick={() => setSymbolFilter(s.symbol)}
-                                            className="w-full px-3 py-2 text-left text-sm font-mono font-bold hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                {symbolFilter === s.symbol ? <Check className="size-3 text-cyan-400" /> : <div className="size-3" />}
-                                                <span className={symbolFilter === s.symbol ? "text-cyan-300" : "text-foreground"}>{s.symbol}</span>
-                                            </div>
-                                            <span className="text-[10px] font-medium text-muted-foreground/50">{s.txCount} tx</span>
-                                        </button>
+                                        <SelectItem key={s.symbol} value={s.symbol}>{s.symbol} · {s.txCount} tx</SelectItem>
                                     ))}
-                                </div>
-                            </div>
-                        )}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
 
                 {activeTab === 'portfolio' && (
                     <div className="w-full flex flex-col gap-2">
-                        {/* Sort chips */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.14em] mr-0.5">Sort</span>
-                            {([
-                                { key: 'position', label: 'POSITION' },
-                                { key: 'pl',       label: 'P&L $' },
-                                { key: 'pl_pct',   label: 'P&L %' },
-                                { key: 'invested', label: 'INVESTED' },
-                                { key: 'symbol',   label: 'A–Z' },
-                                { key: 'trades',   label: 'TRADES' },
-                            ] as { key: PortfolioSort; label: string }[]).map(({ key, label }) => (
-                                <button key={key} onClick={() => setPortfolioSort(key)}
-                                    className={cn(
-                                        'px-2 py-1 text-[8px] font-bold tracking-widest border transition-all',
-                                        portfolioSort === key
-                                            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                                            : 'bg-black/20 border-border/20 text-muted-foreground/40 hover:border-border/40 hover:text-muted-foreground/60'
-                                    )}>
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
+                        <Chips
+                            value={portfolioSort}
+                            onChange={setPortfolioSort}
+                            options={[
+                                { value: 'position', label: 'Position' },
+                                { value: 'pl', label: 'P&L $' },
+                                { value: 'pl_pct', label: 'P&L %' },
+                                { value: 'invested', label: 'Invested' },
+                                { value: 'symbol', label: 'A–Z' },
+                                { value: 'trades', label: 'Trades' },
+                            ]}
+                        />
 
                         {filteredSummaries.length === 0 ? (
                             <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground/30 border border-dashed border-border/20 rounded-xl">
                                 <Inbox className="size-8 opacity-30" />
-                                <p className="text-[10px] tracking-wider">NO POSITIONS FOUND</p>
+                                <p className="text-xs">No positions yet</p>
                             </div>
                         ) : (
                             <div className="flex flex-col gap-2">
@@ -692,10 +639,10 @@ export default function DimeStock() {
                         {filteredTransactions.length === 0 ? (
                             <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground/30 border border-dashed border-border/20 rounded-xl">
                                 <Inbox className="size-8 opacity-30" />
-                                <p className="text-[10px] tracking-wider">NO TRADES FOUND</p>
+                                <p className="text-xs">No trades yet</p>
                             </div>
                         ) : (
-                            <div className="border border-border/20 rounded-none bg-gray-100/70 dark:bg-[oklch(0.11_0.015_255/0.7)] overflow-hidden">
+                            <div className="rounded-2xl bg-card overflow-hidden">
                                 {[...filteredTransactions]
                                     .sort((a, b) => {
                                         const d = b.trade_date.localeCompare(a.trade_date);

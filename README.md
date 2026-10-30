@@ -1,11 +1,11 @@
 # PanAssets — Financial Series Assets
 
-A personal finance PWA (React + TypeScript + Vite) backed by Supabase. Tracks bank/investment account balances, FX conversions, Dime stock trades, FCD (foreign-currency / gold), and monthly salary allocation.
+A personal finance PWA (React + TypeScript + Vite) backed by Cloudflare Workers + D1. Tracks bank/investment account balances, FX conversions, Dime stock trades, FCD (foreign-currency / gold), and monthly salary allocation.
 
 ## Stack
 
 - **React 19** + **Vite 7** + **TypeScript**
-- **Supabase** (`@supabase/supabase-js`) — Postgres backend
+- **Cloudflare Worker + D1** (`worker/index.ts`, `migrations/`) — SQLite backend behind `/api/query`
 - **Tailwind CSS 3** + **shadcn/radix-ui** components
 - **recharts** / **chart.js** for charts, **tesseract.js** for receipt OCR
 - **vite-plugin-pwa** for installable PWA (iOS/Android)
@@ -14,18 +14,11 @@ A personal finance PWA (React + TypeScript + Vite) backed by Supabase. Tracks ba
 
 ```bash
 npm install
-cp .env.example .env   # then fill in your Supabase credentials
-npm run dev
+npm run build
+npm run dev:api   # Worker + static assets on :8787, using the remote D1 database
 ```
 
-### Environment variables
-
-Create `.env` (not committed) with:
-
-```
-VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
+The D1 binding (`PANTAGON_PERSONAL`) is declared in `wrangler.jsonc`. Schema: `migrations/`.
 
 ## Scripts
 
@@ -33,7 +26,8 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 |---|---|
 | `npm run dev` | Start dev server (default port 5173) |
 | `npm run build` | Type-check + production build |
-| `npm run preview` | Preview the production build |
+| `npm run dev:api` | Run the Worker locally against remote D1 |
+| `npm run deploy` | Build and deploy to Cloudflare |
 | `npm run lint` | Run ESLint |
 
 ## Supabase tables

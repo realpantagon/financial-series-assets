@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 import type { FinancialFX } from '../types';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getErrorMessage } from '@/lib/utils';
 import {
@@ -12,10 +10,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { TrendingUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 export default function FXAnalytics() {
-    const navigate = useNavigate();
     const [data, setData] = useState<FinancialFX[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -26,7 +23,7 @@ export default function FXAnalytics() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase.from('pantagon_financial_fx').select('*');
+            const { data, error } = await db.from('pantagon_financial_fx').select('*');
             if (error) throw error;
             setData(data || []);
         } catch (err) {
@@ -92,8 +89,8 @@ export default function FXAnalytics() {
             <div className="flex flex-col gap-4 pt-4 pb-24">
                 <Skeleton className="h-8 w-32" />
                 <div className="grid grid-cols-2 gap-3">
-                    <Skeleton className="h-10 rounded-lg" />
-                    <Skeleton className="h-10 rounded-lg" />
+                    <Skeleton className="h-10 rounded-xl" />
+                    <Skeleton className="h-10 rounded-xl" />
                 </div>
                 <Skeleton className="h-36 rounded-2xl" />
                 <div className="grid grid-cols-2 gap-3">
@@ -110,18 +107,10 @@ export default function FXAnalytics() {
 
     return (
         <div className="flex flex-col gap-4 pb-24 pt-4">
-            {/* Header */}
-            <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" onClick={() => navigate('/fx')} className="size-9 rounded-full shrink-0">
-                    <ArrowLeft className="size-4" />
-                </Button>
-                <h1 className="text-xl font-bold text-foreground">FX Analytics</h1>
-            </div>
-
-            {/* Filters */}
+{/* Filters */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Year</label>
+                    <label className="text-xs font-semibold text-muted-foreground">Year</label>
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger className="h-9 text-sm">
                             <SelectValue />
@@ -133,7 +122,7 @@ export default function FXAnalytics() {
                     </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Currency</label>
+                    <label className="text-xs font-semibold text-muted-foreground">Currency</label>
                     <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
                         <SelectTrigger className="h-9 text-sm">
                             <SelectValue />
@@ -146,13 +135,13 @@ export default function FXAnalytics() {
             </div>
 
             {/* Avg Rate Hero */}
-            <div className="rounded-xl border border-blue-500/20 bg-gradient-to-br from-card to-blue-500/5 p-5 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 to-transparent pointer-events-none" />
-                <TrendingUp className="absolute -right-4 -bottom-4 size-32 text-blue-500/8 pointer-events-none" />
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2 relative">
+            <div className="rounded-2xl bg-card p-5 relative overflow-hidden">
+                <div className="absolute inset-0 bg-transparent pointer-events-none" />
+                <TrendingUp className="absolute -right-4 -bottom-4 size-32 text-cyan-500/8 pointer-events-none" />
+                <p className="text-xs text-muted-foreground font-semibold mb-2 relative">
                     Weighted Average Rate
                 </p>
-                <p className="font-mono text-5xl font-bold tracking-tight text-foreground relative">{analytics.avgRate.toFixed(4)}</p>
+                <p className="font-mono text-5xl font-semibold text-foreground relative">{analytics.avgRate.toFixed(4)}</p>
                 <p className="text-[11px] font-mono text-muted-foreground mt-2 relative">
                     {analytics.count} transaction{analytics.count !== 1 ? 's' : ''}
                     {selectedYear !== 'All' ? ` · ${selectedYear}` : ''}
@@ -161,50 +150,50 @@ export default function FXAnalytics() {
 
             {/* Currency Flow Cards */}
             <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-border/30 bg-card/60 p-4">
-                    <div className="size-9 rounded-full bg-blue-500/15 border border-blue-500/25 flex items-center justify-center mb-3">
-                        <span className="text-blue-400 font-bold text-[10px]">{selectedCurrency}</span>
+                <div className="rounded-2xl bg-card/60 p-4">
+                    <div className="size-9 rounded-full bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center mb-3">
+                        <span className="text-cyan-400 font-semibold text-xs">{selectedCurrency}</span>
                     </div>
-                    <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1">
                         {selectedCurrency} In
                     </p>
-                    <p className="text-xl font-mono font-bold text-foreground truncate">
+                    <p className="text-xl font-mono font-semibold text-foreground truncate">
                         {analytics.totalForeignIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                 </div>
 
-                <div className="rounded-xl border border-border/30 bg-card/60 p-4">
+                <div className="rounded-2xl bg-card/60 p-4">
                     <div className="size-9 rounded-full bg-orange-500/15 border border-orange-500/25 flex items-center justify-center mb-3">
-                        <span className="text-orange-400 font-bold text-[10px]">{selectedCurrency}</span>
+                        <span className="text-orange-400 font-semibold text-xs">{selectedCurrency}</span>
                     </div>
-                    <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1">
                         {selectedCurrency} Out
                     </p>
-                    <p className="text-xl font-mono font-bold text-foreground truncate">
+                    <p className="text-xl font-mono font-semibold text-foreground truncate">
                         {analytics.totalForeignOut.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                 </div>
 
-                <div className="rounded-xl border border-border/30 bg-card/60 p-4">
+                <div className="rounded-2xl bg-card/60 p-4">
                     <div className="size-9 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-3">
                         <ArrowDownLeft className="size-4 text-emerald-400" />
                     </div>
-                    <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1">
                         THB In
                     </p>
-                    <p className="text-xl font-mono font-bold text-foreground truncate">
+                    <p className="text-xl font-mono font-semibold text-foreground truncate">
                         {analytics.totalThbIn.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </p>
                 </div>
 
-                <div className="rounded-xl border border-border/30 bg-card/60 p-4">
+                <div className="rounded-2xl bg-card/60 p-4">
                     <div className="size-9 rounded-full bg-rose-500/15 border border-rose-500/25 flex items-center justify-center mb-3">
                         <ArrowUpRight className="size-4 text-rose-400" />
                     </div>
-                    <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground mb-1">
                         THB Out
                     </p>
-                    <p className="text-xl font-mono font-bold text-foreground truncate">
+                    <p className="text-xl font-mono font-semibold text-foreground truncate">
                         {analytics.totalThbOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </p>
                 </div>

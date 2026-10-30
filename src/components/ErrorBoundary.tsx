@@ -30,13 +30,13 @@ export class ErrorBoundary extends Component<Props, State> {
         return (
             <div className="min-h-screen flex items-center justify-center p-6 bg-background">
                 <div className="max-w-md w-full border border-rose-500/30 bg-rose-500/5 p-6 rounded-xl flex flex-col gap-4">
-                    <p className="text-[10px] font-bold text-rose-300 uppercase tracking-[0.16em]">Something broke</p>
+                    <p className="text-xs font-semibold text-rose-300">Something broke</p>
                     <p className="text-sm text-foreground/80 font-mono break-words">
                         {getErrorMessage(this.state.error)}
                     </p>
                     <button
                         onClick={this.handleReload}
-                        className="h-10 text-xs font-bold tracking-[0.14em] border border-cyan-500/35 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 rounded-none"
+                        className="h-10 text-xs font-semibold border border-cyan-500/35 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 rounded-xl"
                     >
                         RELOAD APP
                     </button>

@@ -1,0 +1,10 @@
+{
+  "name": "pan-assets",
+  "account_id": "b76e4b50bfd52760bbbfec7ff7fc89c0",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-10-01",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "PANTAGON_PERSONAL", "database_id": "63c3fba9-ac1d-4260-b1ce-79470b3519af", "migrations_dir": "migrations" }
+  ]
+}

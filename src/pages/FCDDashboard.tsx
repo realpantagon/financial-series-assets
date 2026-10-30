@@ -5,8 +5,15 @@ import { useCallback, useEffect, useState } from "react"
 import { fetchAllFCDEntries, addFCDEntry, calculateFCDStats, formatCurrency } from "../api/fcd"
 import type { FCDEntry, FCDStats, NewFCDEntry, FCDTxType } from "../api/fcd/types"
 import { format, parseISO, parse } from "date-fns"
-import Input from "../components/fcd/Input"
-import Button from "../components/fcd/Button"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { BottomSheet, Chips, Field, Group, Money, PrimaryButton, SectionLabel, Segmented, fieldClass } from "@/components/ios"
+import { cn } from "@/lib/utils"
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Coins, Inbox, Percent, Plus, RefreshCw, ScanLine, type LucideIcon } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface ExtractedFields {
@@ -47,6 +54,8 @@ function parseExtractedDate(dateStr: string | null): string {
   }
 }
 
+const PAGE = 30
+
 export default function FCDDashboard() {
   const [entries, setEntries] = useState<FCDEntry[]>([])
   const [stats, setStats] = useState<FCDStats | null>(null)
@@ -61,7 +70,9 @@ export default function FCDDashboard() {
 
   // UI State
   const [showAddEntry, setShowAddEntry] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [shown, setShown] = useState(PAGE)
+  const [filter, setFilter] = useState<"ALL" | "FX" | "GOLD" | "INTEREST" | "TRANSFER">("ALL")
+  const [saving, setSaving] = useState(false)
 
   // Entry form
   const [entryData, setEntryData] = useState<NewFCDEntry>({
@@ -140,23 +151,23 @@ export default function FCDDashboard() {
     // Validation: FX requires rate & thb
     if (entryData.tx_type === "FX") {
       if ((entryData.rate ?? 0) <= 0 || (entryData.thb ?? 0) <= 0) {
-        alert("For FX, Rate and THB are required")
+        toast.error("FX needs both THB amount and rate")
         return
       }
     } else {
       // Validation: Non-FX must have null thb/rate
       if (entryData.thb != null && entryData.thb !== 0) {
-        alert(`For ${entryData.tx_type}, THB must be empty (null).`)
+        toast.error(`${entryData.tx_type} entries cannot have a THB amount`)
         return
       }
       if (entryData.rate != null && entryData.rate !== 0) {
-        alert(`For ${entryData.tx_type}, Rate must be empty (null).`)
+        toast.error(`${entryData.tx_type} entries cannot have a rate`)
         return
       }
     }
 
     if (entryData.usd <= 0) {
-      alert("Please enter USD amount")
+      toast.error("Enter a USD amount")
       return
     }
 
@@ -178,6 +189,7 @@ export default function FCDDashboard() {
     }
 
     try {
+      setSaving(true)
       await addFCDEntry(payload)
       setEntryData({
         tx_type: "FX",
@@ -189,9 +201,13 @@ export default function FCDDashboard() {
         note: "",
       })
       fetchData()
+      setShowAddEntry(false)
+      toast.success("Entry saved")
     } catch (error) {
       console.error("Error adding FCD entry:", error)
-      alert("Failed to add entry")
+      toast.error("Could not save entry")
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -214,12 +230,6 @@ export default function FCDDashboard() {
     setOcrProgress(0)
 
     try {
-      const typhoonApiKey = import.meta.env.VITE_TYPHOON_API_KEY
-
-      if (!typhoonApiKey) {
-        throw new Error("Typhoon API key not found in environment variables")
-      }
-
       setOcrProgress(20)
 
       const mimeType = image.split(",")[0].split(":")[1].split(";")[0]
@@ -237,19 +247,15 @@ export default function FCDDashboard() {
 
       setOcrProgress(40)
 
-      const typhoonResponse = await fetch("https://api.opentyphoon.ai/v1/ocr", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${typhoonApiKey}`,
-        },
-        body: formData,
-      })
+      const typhoonResponse = await fetch("/api/ocr", { method: "POST", body: formData })
 
       setOcrProgress(60)
 
       if (!typhoonResponse.ok) {
         const errorText = await typhoonResponse.text()
-        throw new Error(`Typhoon OCR failed: ${errorText}`)
+        let message = errorText
+        try { message = JSON.parse(errorText).error?.message ?? errorText } catch { /* plain text */ }
+        throw new Error(message)
       }
 
       const typhoonResult = await typhoonResponse.json()
@@ -293,7 +299,7 @@ export default function FCDDashboard() {
       setOcrProgress(100)
     } catch (error) {
       console.error("OCR Error:", error)
-      alert(`Error extracting text: ${error instanceof Error ? error.message : "Please try again."}`)
+      toast.error("Could not read the slip", { description: error instanceof Error ? error.message : "Please try again." })
     } finally {
       setOcrLoading(false)
       setOcrProgress(0)
@@ -320,521 +326,336 @@ export default function FCDDashboard() {
     })
 
     setShowUploadModal(false)
+    setShowAddEntry(true)
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] bg-background text-foreground">
-        <div className="text-muted-foreground">Loading…</div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
       </div>
     )
   }
 
+  const cash = stats?.cash_remain ?? 0
+  const netFlow = stats && stats.total_in > 0 ? (cash / stats.total_in) * 100 : 0
+  const gold = stats?.gold_profit ?? 0
+
+  const filtered = entries
+    .filter((e) => {
+      if (filter === "ALL") return true
+      if (filter === "GOLD") return e.tx_type === "GOLD_BUY" || e.tx_type === "GOLD_SELL"
+      if (filter === "INTEREST") return e.tx_type === "INTEREST" || e.status === "Interest"
+      return e.tx_type === filter
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const visible = filtered.slice(0, shown)
+
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-background text-foreground pb-8 font-mono">
-      {/* Header */}
-      <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md border-b border-border/20 px-3 py-3 mb-2">
-        <div className="flex justify-between items-start gap-3">
-          <div>
-            <h1 className="text-xl font-bold font-mono tracking-tight text-foreground">FCD Tracker</h1>
-          </div>
-          <Button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-cyan-500 text-black font-bold border-none hover:bg-cyan-400 text-xs tracking-wider"
-          >
-            UPLOAD SLIP
-          </Button>
-        </div>
+    <div className="flex flex-col gap-4">
+      {/* Actions */}
+      <div className="grid grid-cols-2 gap-2">
+        <Button onClick={() => setShowAddEntry(true)}>
+          <Plus data-icon="inline-start" />
+          Add entry
+        </Button>
+        <Button variant="secondary" onClick={() => setShowUploadModal(true)}>
+          <ScanLine data-icon="inline-start" />
+          Upload slip
+        </Button>
       </div>
 
-      <div className="px-2 space-y-2">
-        {/* Summary Cards */}
-        {/* Summary Cards */}
-        {/* Summary Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {/* Liquidity Section */}
-          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
-            <h3 className="text-sm font-bold text-muted-foreground/60 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Liquidity
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-muted-foreground text-xs mb-1">Cash Remain</div>
-                  <div className={`text-2xl font-bold ${stats && stats.cash_remain < 0 ? 'text-rose-400' : 'text-foreground'}`}>
-                    {formatCurrency(stats?.cash_remain || 0, "USD")}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-muted-foreground/60 mb-1">Net Flow</div>
-                  <div className={`text-sm font-medium px-2 py-1 rounded-full ${stats && stats.cash_remain >= 0 ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400' : 'bg-rose-500/15 border border-rose-500/20 text-rose-400'}`}>
-                    {stats && stats.cash_remain >= 0 ? '+' : ''}{((stats?.cash_remain || 0) / (stats?.total_in || 1) * 100).toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/10">
-                <div>
-                  <div className="text-xs text-muted-foreground/60 mb-1 flex items-center gap-1">
-                    <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                    Total In
-                  </div>
-                  <div className="text-lg font-bold text-emerald-400">{formatCurrency(stats?.total_in || 0, "USD")}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground/60 mb-1 flex items-center gap-1">
-                    <svg className="w-3 h-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
-                    Total Out
-                  </div>
-                  <div className="text-lg font-bold text-rose-400">{formatCurrency(stats?.total_out || 0, "USD")}</div>
-                </div>
-              </div>
-            </div>
+      {/* Cash */}
+      <section className="rounded-3xl bg-card px-5 pt-5 pb-4">
+        <div className="flex items-center justify-between">
+          <p className="text-[13px] font-medium text-muted-foreground">Cash remaining</p>
+          <Badge variant={cash >= 0 ? "success" : "destructive"}>
+            {cash >= 0 ? "+" : ""}{netFlow.toFixed(1)}% of inflow
+          </Badge>
+        </div>
+        <Money value={cash} symbol="$" className={cn("mt-2", cash < 0 && "text-rose-500")} />
+        <div className="mt-5 pt-4 border-t border-border/60 grid grid-cols-2 gap-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+              <ArrowDownLeft className="size-4 text-emerald-500" /> Total in
+            </p>
+            <p className="mt-1 text-[20px] font-semibold tabular-nums text-emerald-500">{formatCurrency(stats?.total_in ?? 0, "USD")}</p>
           </div>
-
-          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
-            <h3 className="text-sm font-bold text-muted-foreground/60 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-              Performance
-            </h3>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-6">
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Gold Profit</div>
-                <div className={`text-xl font-bold ${stats && stats.gold_profit >= 0 ? 'text-amber-500' : 'text-rose-400'}`}>
-                  {stats && stats.gold_profit > 0 ? '+' : ''}{formatCurrency(stats?.gold_profit || 0, "USD")}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Interest Income</div>
-                <div className="text-xl font-bold text-cyan-400">
-                  +{formatCurrency(stats?.interest_income || 0, "USD")}
-                </div>
-              </div>
-              <div className="col-span-2 pt-4 border-t border-border/10 flex justify-between items-center">
-                <div className="text-xs text-muted-foreground/60">Weighted Avg Rate</div>
-                <div className="text-2xl font-mono font-medium text-foreground/90 tracking-tight">
-                  {stats?.weighted_avg_rate.toFixed(4) || "0.0000"} <span className="text-xs text-muted-foreground/60 font-mono">THB/USD</span>
-                </div>
-              </div>
-            </div>
+          <div>
+            <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+              <ArrowUpRight className="size-4 text-rose-500" /> Total out
+            </p>
+            <p className="mt-1 text-[20px] font-semibold tabular-nums text-rose-500">{formatCurrency(stats?.total_out ?? 0, "USD")}</p>
           </div>
         </div>
+      </section>
 
-        {/* Exchange Rate Chart */}
-        {rateChartData.length > 0 && (
-          <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none p-3 border border-border/20 shadow-none">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Exchange Rate Trend</h2>
-                <p className="text-xs text-muted-foreground mt-1">Rate fluctuations over time</p>
-              </div>
-              <div className="text-xs font-medium px-2 py-1 bg-cyan-500/10 text-cyan-400 rounded-lg">LIVE</div>
-            </div>
+      {/* Performance */}
+      <div>
+        <SectionLabel>Performance</SectionLabel>
+        <Group>
+          <StatRow label="Gold profit" value={`${gold > 0 ? "+" : ""}${formatCurrency(gold, "USD")}`} tone={gold < 0 ? "text-rose-500" : "text-foreground"} />
+          <StatRow label="Interest income" value={`+${formatCurrency(stats?.interest_income ?? 0, "USD")}`} tone="text-emerald-500" />
+          <StatRow label="Average rate" value={`${(stats?.weighted_avg_rate ?? 0).toFixed(4)} THB/USD`} />
+        </Group>
+      </div>
+
+      {/* Rate chart */}
+      {rateChartData.length > 0 && (
+        <div>
+          <SectionLabel>Exchange rate</SectionLabel>
+          <div className="rounded-2xl bg-card pt-4 pr-3 pb-2 pl-1">
             <div className="w-full h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rateChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" vertical={false} />
+                <LineChart data={rateChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="oklch(var(--border))" strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="date"
-                    stroke="#52525b"
-                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    tick={{ fontSize: 11, fill: "oklch(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
-                    angle={-90}
-                    textAnchor="end"
-                    height={50}
                     interval="preserveStartEnd"
+                    minTickGap={32}
                   />
                   <YAxis
-                    stroke="#52525b"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    width={44}
+                    tick={{ fontSize: 11, fill: "oklch(var(--muted-foreground))" }}
                     axisLine={false}
                     tickLine={false}
-                    domain={['auto', 'auto']}
-                    tickFormatter={(value: number) => value.toFixed(2)}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(value: number) => value.toFixed(1)}
                   />
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "12px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
-                    itemStyle={{ color: "#f8fafc" }}
-                    labelStyle={{ color: "#52525b", marginBottom: "0.25rem", fontSize: "0.75rem" }}
-                    formatter={(value) => [value ? Number(value).toFixed(4) : "0.0000", 'Rate']}
+                    contentStyle={{ backgroundColor: "oklch(var(--popover))", border: "none", borderRadius: 12, color: "oklch(var(--foreground))" }}
+                    itemStyle={{ color: "oklch(var(--foreground))" }}
+                    labelStyle={{ color: "oklch(var(--muted-foreground))", fontSize: 12 }}
+                    formatter={(value) => [value ? Number(value).toFixed(4) : "0.0000", "Rate"]}
                   />
                   <Line
                     type="monotone"
                     dataKey="rate"
-                    stroke="#22d3ee"
-                    strokeWidth={3}
-                    dot={{ r: 0, strokeWidth: 0 }}
-                    activeDot={{ r: 6, stroke: "#67e8f9", strokeWidth: 3, fill: "#fff" }}
+                    stroke="oklch(var(--brand))"
+                    strokeWidth={2.5}
+                    dot={false}
+                    isAnimationActive={false}
+                    activeDot={{ r: 5, strokeWidth: 0, fill: "oklch(var(--brand))" }}
                     name="Rate"
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Ledger */}
+      <div className="flex flex-col gap-3">
+        <SectionLabel right={<span className="text-[13px] text-muted-foreground">{filtered.length} records</span>}>
+          Transactions
+        </SectionLabel>
+        <Chips
+          className="-mt-3"
+          value={filter}
+          onChange={(v) => { setFilter(v); setShown(PAGE) }}
+          options={[
+            { value: "ALL", label: "All" },
+            { value: "FX", label: "FX" },
+            { value: "GOLD", label: "Gold" },
+            { value: "INTEREST", label: "Interest" },
+            { value: "TRANSFER", label: "Transfer" },
+          ]}
+        />
+
+        {filtered.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><Inbox /></EmptyMedia>
+              <EmptyTitle>No transactions</EmptyTitle>
+              <EmptyDescription>{entries.length === 0 ? "Add your first entry to start the ledger." : "Nothing matches this filter."}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Group>{visible.map((entry) => <EntryRow key={entry.id} entry={entry} />)}</Group>
         )}
 
-        {/* Add Entry Form */}
-        <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none overflow-hidden">
-          <button
-            onClick={() => setShowAddEntry(!showAddEntry)}
-            className="w-full px-3 py-3 flex justify-between items-center text-left hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              </div>
-              <h2 className="text-base font-bold text-foreground">Add New Entry</h2>
+        {visible.length < filtered.length && (
+          <Button variant="secondary" className="w-full h-12" onClick={() => setShown((n) => n + PAGE)}>
+            Show more ({filtered.length - visible.length} left)
+          </Button>
+        )}
+      </div>
+
+      {/* Add entry */}
+      <BottomSheet open={showAddEntry} onOpenChange={setShowAddEntry} title="Add entry">
+        <div className="flex flex-col gap-4 pb-2">
+          <Segmented
+            value={entryData.tx_type as "FX" | "INTEREST" | "TRANSFER"}
+            onChange={(v) => handleTxTypeChange(v)}
+            options={[
+              { value: "FX", label: "FX" },
+              { value: "INTEREST", label: "Interest" },
+              { value: "TRANSFER", label: "Transfer" },
+            ]}
+          />
+
+          {entryData.tx_type === "TRANSFER" && (
+            <Segmented
+              value={entryData.status === "OUT" ? "OUT" : "IN"}
+              onChange={(v) => setEntryData({ ...entryData, status: v })}
+              options={[{ value: "IN", label: "Money in", tone: "in" }, { value: "OUT", label: "Money out", tone: "out" }]}
+            />
+          )}
+
+          <Field label="USD amount">
+            <input
+              type="number" inputMode="decimal" step="0.01" placeholder="0.00"
+              value={entryData.usd || ""}
+              onChange={(e) => setEntryData({ ...entryData, usd: Number.parseFloat(e.target.value) || 0 })}
+              className={cn(fieldClass, "h-14 text-[24px] font-semibold tabular-nums")}
+            />
+          </Field>
+
+          {entryData.tx_type === "FX" && (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="THB amount">
+                <input
+                  type="number" inputMode="decimal" step="0.01" placeholder="0.00"
+                  value={entryData.thb || ""}
+                  onChange={(e) => setEntryData({ ...entryData, thb: Number.parseFloat(e.target.value) || 0 })}
+                  className={fieldClass}
+                />
+              </Field>
+              <Field label="Rate">
+                <input
+                  type="number" inputMode="decimal" step="0.0001" placeholder="0.0000"
+                  value={entryData.rate || ""}
+                  onChange={(e) => setEntryData({ ...entryData, rate: Number.parseFloat(e.target.value) || 0 })}
+                  className={fieldClass}
+                />
+              </Field>
             </div>
-            <span className={`text-muted-foreground/60 transition-transform duration-200 ${showAddEntry ? 'rotate-180' : ''}`}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </span>
-          </button>
-          {showAddEntry && (
-            <div className="px-3 pb-4 pt-1 space-y-3 border-t border-border/20">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">Transaction Type</span>
-                  <select
-                    value={entryData.tx_type}
-                    onChange={(e) => handleTxTypeChange(e.target.value as FCDTxType)}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md transition-all shadow-none"
-                  >
-                    <option value="FX">💱 FX Exchange</option>
-                    <option value="INTEREST">📈 Interest</option>
-                    <option value="TRANSFER">↔️ Transfer</option>
-                  </select>
-                </label>
+          )}
 
-                <label className="block">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">Date & Time</span>
-                  <Input
-                    type="datetime-local"
-                    value={entryData.date}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEntryData({ ...entryData, date: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all shadow-none"
-                  />
-                </label>
+          <Field label="Date & time">
+            <input
+              type="datetime-local" value={entryData.date}
+              onChange={(e) => setEntryData({ ...entryData, date: e.target.value })}
+              className={fieldClass}
+            />
+          </Field>
 
-                <label className="block">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">USD Amount</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={entryData.usd || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEntryData({ ...entryData, usd: Number.parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all shadow-none font-medium"
-                    placeholder="0.00"
-                  />
-                </label>
+          <Field label="Note (optional)">
+            <input
+              type="text" value={entryData.note || ""} placeholder="Add details"
+              onChange={(e) => setEntryData({ ...entryData, note: e.target.value })}
+              className={fieldClass}
+            />
+          </Field>
 
-                <label className="block">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">Status</span>
-                  <select
-                    value={entryData.status}
-                    onChange={(e) => setEntryData({ ...entryData, status: e.target.value })}
-                    disabled={entryData.tx_type !== 'TRANSFER'}
-                    className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md disabled:bg-white/5 disabled:text-muted-foreground/60 transition-all shadow-none"
-                  >
-                    <option value="IN">Create Income (IN)</option>
-                    <option value="OUT">Create Expense (OUT)</option>
-                    <option value="Interest">Interest Income</option>
-                  </select>
-                </label>
+          <PrimaryButton onClick={handleAddEntry} loading={saving}>
+            Save {entryData.tx_type === "FX" ? "FX exchange" : entryData.tx_type === "INTEREST" ? "interest" : "transfer"}
+          </PrimaryButton>
+        </div>
+      </BottomSheet>
 
-                {entryData.tx_type === 'FX' && (
-                  <>
-                    <label className="block">
-                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">THB Amount</span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={entryData.thb || ""}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEntryData({ ...entryData, thb: Number.parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all shadow-none"
-                        placeholder="0.00"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">Exchange Rate</span>
-                      <Input
-                        type="number"
-                        step="0.0001"
-                        value={entryData.rate || ""}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEntryData({ ...entryData, rate: Number.parseFloat(e.target.value) || 0 })}
-                        className="w-full px-3 py-2.5 border border-border/20 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 transition-all shadow-none"
-                        placeholder="0.0000"
-                      />
-                    </label>
-                  </>
-                )}
+      {/* Upload slip */}
+      <BottomSheet open={showUploadModal} onOpenChange={(o) => { if (!o) resetOCR() }} title="Upload slip">
+        <div className="flex flex-col gap-4 pb-2">
+          <input type="file" accept="image/*" onChange={handleImageUpload} className="field" />
 
-                <label className="block md:col-span-2">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2 block">Note</span>
-                  <Input
-                    type="text"
-                    value={entryData.note || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEntryData({ ...entryData, note: e.target.value })}
-                    className="w-full px-3 py-2 border border-border/30 rounded-none text-xs font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500/40 bg-black/20 shadow-none"
-                    placeholder="Optional description..."
-                  />
-                </label>
+          {image && (
+            <div className="w-full rounded-2xl overflow-hidden">
+              <img src={image} alt="Uploaded slip" className="w-full h-auto" />
+            </div>
+          )}
+
+          <PrimaryButton onClick={extractText} disabled={!image} loading={ocrLoading}>
+            {ocrLoading ? `Extracting… ${ocrProgress}%` : "Extract text"}
+          </PrimaryButton>
+
+          {modalFields && (
+            <div className="flex flex-col gap-4 pt-4 border-t border-border/60">
+              <Alert>
+                <AlertDescription>Review the values, then fill the entry form.</AlertDescription>
+              </Alert>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="USD">
+                  <input type="number" inputMode="decimal" step="0.01" value={modalFields.USD ?? ""}
+                    onChange={(e) => setModalFields({ ...modalFields, USD: Number.parseFloat(e.target.value) || 0 })} className={fieldClass} />
+                </Field>
+                <Field label="THB">
+                  <input type="number" inputMode="decimal" step="0.01" value={modalFields.THB ?? ""}
+                    onChange={(e) => setModalFields({ ...modalFields, THB: Number.parseFloat(e.target.value) || 0 })} className={fieldClass} />
+                </Field>
+                <Field label="Rate">
+                  <input type="number" inputMode="decimal" step="0.0001" value={modalFields.Rate ?? ""}
+                    onChange={(e) => setModalFields({ ...modalFields, Rate: Number.parseFloat(e.target.value) || 0 })} className={fieldClass} />
+                </Field>
+                <Field label="Date">
+                  <input type="text" value={modalFields.Date ?? ""} placeholder="22 Dec 2025 - 12:30 AM"
+                    onChange={(e) => setModalFields({ ...modalFields, Date: e.target.value })} className={fieldClass} />
+                </Field>
               </div>
-
-              <Button onClick={handleAddEntry} className="w-full bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 py-3 h-12 rounded-none border border-cyan-500/40 shadow-none tracking-[0.16em]">
-                {entryData.tx_type === 'FX' ? '+ CONFIRM FX' : '+ CONFIRM ENTRY'}
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="secondary" className="h-12" onClick={resetOCR}>Clear</Button>
+                <Button className="h-12" onClick={fillFromModal}>Fill entry</Button>
+              </div>
             </div>
           )}
         </div>
+      </BottomSheet>
+    </div>
+  )
+}
 
-        {/* Entries List */}
-        <div className="bg-slate-200/40 dark:bg-[oklch(0.09_0.012_255/0.4)] backdrop-blur-md rounded-none border border-border/20 shadow-none">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-bold text-foreground">Recent Transactions</h2>
-            <span className="text-xs font-medium text-muted-foreground/60">{entries.length} records</span>
-          </div>
-          <div className="space-y-0">
-            {(() => {
-              const sortedEntries = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              const totalPages = Math.ceil(sortedEntries.length / 10);
-              const paginatedEntries = sortedEntries.slice((currentPage - 1) * 10, currentPage * 10);
+// ─── Rows ─────────────────────────────────────────────────────────────────────
 
-              return (
-                <>
-                  {paginatedEntries.map((entry) => {
-                let icon;
-                let txLabel = entry.tx_type as string;
-                let amountColor = 'text-foreground';
+function StatRow({ label, value, tone = "text-foreground" }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 min-h-[52px]">
+      <span className="text-[17px]">{label}</span>
+      <span className={cn("text-[17px] font-semibold tabular-nums", tone)}>{value}</span>
+    </div>
+  )
+}
 
-                // Determine Icon and Label style
-                if (entry.tx_type === 'FX') {
-                  icon = <span className="text-lg">💱</span>;
-                  txLabel = 'FX Exchange';
-                } else if (entry.tx_type === 'GOLD_BUY') {
-                  icon = <span className="text-lg">🟡</span>;
-                  txLabel = 'Gold Buy';
-                  amountColor = 'text-foreground';
-                } else if (entry.tx_type === 'GOLD_SELL') {
-                  icon = <span className="text-lg">💰</span>;
-                  txLabel = 'Gold Sell';
-                  amountColor = 'text-emerald-400';
-                } else if (entry.tx_type === 'INTEREST' || entry.status === 'Interest') {
-                  icon = <span className="text-lg">📈</span>;
-                  txLabel = 'Interest';
-                  amountColor = 'text-cyan-400';
-                } else {
-                  icon = <span className="text-lg">↔️</span>;
-                  txLabel = 'Transfer';
-                }
+const TYPE_META: Record<string, { label: string; icon: LucideIcon; tint: string }> = {
+  FX: { label: "FX exchange", icon: RefreshCw, tint: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
+  GOLD_BUY: { label: "Gold buy", icon: Coins, tint: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+  GOLD_SELL: { label: "Gold sell", icon: Coins, tint: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+  INTEREST: { label: "Interest", icon: Percent, tint: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
+  TRANSFER: { label: "Transfer", icon: ArrowLeftRight, tint: "bg-primary/15 text-primary" },
+}
 
-                // Override color based on status if needed
-                if (entry.status === 'OUT' && amountColor === 'text-foreground') amountColor = 'text-foreground';
-                // We keep it neutral for OUT, or red if preferred. The prompt didn't specify, but neutral/dark is clean.
-                // Let's make OUT amounts slightly visually distinct? 
-                // Actually sticking to "Performance" colors (profit=green) is better.
+function EntryRow({ entry }: { entry: FCDEntry }) {
+  const key = entry.tx_type === "INTEREST" || entry.status === "Interest" ? "INTEREST" : entry.tx_type
+  const meta = TYPE_META[key] ?? TYPE_META.TRANSFER
+  const Icon = meta.icon
+  const isIn = entry.status === "IN" || entry.status === "Interest"
+  const sub = [
+    format(parseISO(entry.date), "d MMM yyyy, HH:mm"),
+    entry.rate ? `@${Number(entry.rate).toFixed(4)}` : null,
+    entry.origin === "dime" && entry.symbol ? `${entry.symbol} · ${Number(entry.qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${entry.qty_unit ?? ""}` : null,
+  ].filter(Boolean).join(" · ")
 
-                return (
-                  <div key={entry.id} className="group p-3 bg-transparent rounded-none border-b border-border/20 last:border-b-0 hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-200">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-none bg-black/20 flex items-center justify-center border border-border/20 group-hover:bg-cyan-500/10 transition-all text-sm">
-                          {icon}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground text-sm">{txLabel}</span>
-                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full ${entry.status === 'IN' || entry.status === 'Interest'
-                              ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400'
-                              : 'bg-rose-500/15 border border-rose-500/20 text-rose-400'
-                              }`}>
-                              {entry.status}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                            <span>{format(parseISO(entry.date), "dd MMM yyyy, HH:mm")}</span>
-                            {entry.origin === 'dime' && entry.symbol && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                <span className="font-medium text-muted-foreground">
-                                  {entry.symbol} · {Number(entry.qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} {entry.qty_unit ?? ''}
-                                </span>
-                                <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide rounded bg-cyan-500/15 border border-cyan-500/20 text-cyan-400">auto</span>
-                              </>
-                            )}
-                            {entry.rate && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                <span className="font-medium text-muted-foreground">@{Number(entry.rate).toFixed(4)}</span>
-                              </>
-                            )}
-                          </div>
-                          {entry.note && (
-                            <div className="mt-2 text-xs text-muted-foreground bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg inline-block border border-border/20 italic">
-                              {entry.note}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className={`text-sm tracking-tight font-bold ${amountColor}`}>
-                          {entry.status === 'OUT' ? '-' : '+'}{formatCurrency(entry.usd, "USD")}
-                        </div>
-                        {entry.thb && (
-                          <div className="text-xs text-muted-foreground/60 mt-0.5 font-medium">
-                            {formatCurrency(entry.thb, "THB")}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {entries.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground/60 bg-slate-100 dark:bg-white/5 rounded-xl border border-dashed border-border/20">
-                  <div className="text-4xl mb-3">📝</div>
-                  <p>No transactions yet.</p>
-                  <button onClick={() => setShowAddEntry(true)} className="text-cyan-400 font-medium text-sm mt-2 hover:underline">
-                    Add your first entry
-                  </button>
-                </div>
-              )}
-
-              {totalPages > 1 && (
-                <div className="flex justify-between items-center p-3 border-t border-border/20 bg-black/10">
-                  <Button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
-                  >
-                    PREV
-                  </Button>
-                  <span className="text-[10px] text-muted-foreground/60 font-mono tracking-[0.2em] font-bold">PAGE {currentPage}/{totalPages}</span>
-                  <Button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="bg-black/20 hover:bg-slate-100 dark:hover:bg-white/5 border border-border/30 text-[10px] tracking-widest px-3 h-8 rounded-none disabled:opacity-30 disabled:hover:bg-black/20"
-                  >
-                    NEXT
-                  </Button>
-                </div>
-              )}
-            </>
-          );
-        })()}
-          </div>
-        </div>
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 min-h-[68px]">
+      <span className={cn("size-10 shrink-0 rounded-full flex items-center justify-center", meta.tint)}>
+        <Icon className="size-5" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[17px] font-medium leading-snug">{meta.label}</p>
+        <p className="text-[13px] text-muted-foreground tabular-nums">{sub}</p>
+        {entry.note && <p className="text-[13px] text-muted-foreground truncate">{entry.note}</p>}
       </div>
-
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed top-0 inset-x-0 z-[60] h-[100dvh] bg-black/70 backdrop-blur-md flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-md bg-white/95 dark:bg-[oklch(0.09_0.012_255/0.95)] border-t sm:border border-border/30 rounded-none p-4 pb-12 sm:pb-6 max-h-[90vh] overflow-y-auto animate-slide-up shadow-2xl">
-            <div className="flex justify-between items-center mb-4 border-b border-border/20 pb-3">
-              <h3 className="text-sm tracking-[0.1em] font-bold text-foreground uppercase">Upload Slip</h3>
-              <button
-                onClick={resetOCR}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-muted-foreground text-xl"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="block w-full text-sm text-muted-foreground
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-lg file:border-0
-                  file:text-sm file:font-bold
-                  file:bg-cyan-500 text-black font-bold file:text-white
-                  hover:file:bg-cyan-400"
-              />
-
-              {image && (
-                <div className="w-full rounded-lg overflow-hidden border border-border/20">
-                  <img src={image} alt="Uploaded slip" className="w-full h-auto" />
-                </div>
-              )}
-
-              <Button
-                onClick={extractText}
-                disabled={ocrLoading}
-                className="w-full bg-cyan-500 text-black font-bold hover:bg-cyan-400 text-white py-3 font-bold disabled:opacity-50"
-              >
-                {ocrLoading ? `Extracting… ${ocrProgress}%` : "Extract text"}
-              </Button>
-
-              {modalFields && (
-                <div className="space-y-3 pt-2 border-t border-border/20">
-                  <div className="text-sm text-muted-foreground bg-cyan-500/10 p-2 rounded-lg border border-cyan-500/30">
-                    Review and adjust values before filling the form.
-                  </div>
-                  <label className="block">
-                    <span className="text-sm font-medium text-foreground/90 mb-1 block">USD</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={modalFields.USD ?? ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setModalFields({ ...modalFields, USD: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      className="w-full px-3 py-2 border border-border/20 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium text-foreground/90 mb-1 block">THB</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={modalFields.THB ?? ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setModalFields({ ...modalFields, THB: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      className="w-full px-3 py-2 border border-border/20 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium text-foreground/90 mb-1 block">Rate</span>
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      value={modalFields.Rate ?? ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setModalFields({ ...modalFields, Rate: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      className="w-full px-3 py-2 border border-border/20 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium text-foreground/90 mb-1 block">Date</span>
-                    <Input
-                      type="text"
-                      value={modalFields.Date ?? ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setModalFields({ ...modalFields, Date: e.target.value })}
-                      className="w-full px-3 py-2 border border-border/20 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder="22 Dec 2025 - 12:30 AM"
-                    />
-                  </label>
-                  <div className="flex gap-3 pt-2">
-                    <Button onClick={resetOCR} className="flex-1 bg-transparent border border-border/30 hover:bg-slate-100 dark:hover:bg-white/5 text-foreground py-3 h-12">
-                      Clear
-                    </Button>
-                    <Button onClick={fillFromModal} className="flex-1 bg-cyan-500 text-black hover:bg-cyan-400 py-3 h-12 border border-cyan-500/40">
-                      Fill Data
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="text-right shrink-0">
+        <p className={cn("text-[17px] font-semibold tabular-nums", isIn ? "text-emerald-500" : "text-foreground")}>
+          {isIn ? "+" : "-"}{formatCurrency(entry.usd, "USD")}
+        </p>
+        {entry.thb ? <p className="text-[13px] text-muted-foreground tabular-nums">{formatCurrency(entry.thb, "THB")}</p> : null}
+      </div>
     </div>
   )
 }

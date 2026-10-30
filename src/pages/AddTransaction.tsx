@@ -1,247 +1,88 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { db } from '../db';
 import { useAccounts } from '@/lib/accounts';
-import { AccountOption } from '@/components/AccountOption';
-import { ArrowDownLeft, ArrowUpRight, DollarSign, Tag, FileText, Loader2, ChevronLeft, ChevronDown } from 'lucide-react';
+import { useBalances } from '@/lib/balances';
+import { cn, fmtTHB } from '@/lib/utils';
+import { AccountPicker, Field, PrimaryButton, Segmented, fieldClass } from '@/components/ios';
 
 export default function AddTransaction() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { accounts } = useAccounts();
+    const { balances } = useBalances();
     const [accountName, setAccountName] = useState<string>(() => location.state?.accountName ?? '');
-    const [type, setType] = useState<'IN' | 'OUT'>('IN');
+    const [type, setType] = useState<'IN' | 'OUT'>('OUT');
     const [amount, setAmount] = useState<number | ''>('');
-    const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [tag, setTag] = useState('');
     const [note, setNote] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [accountOpen, setAccountOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-    // Close dropdown on outside click
-    useEffect(() => {
-        if (!accountOpen) return;
-        const handler = () => setAccountOpen(false);
-        setTimeout(() => document.addEventListener('click', handler), 0);
-        return () => document.removeEventListener('click', handler);
-    }, [accountOpen]);
-
-    const { accounts: accountList } = useAccounts();
-    const accountOptions = accountList.map(a => a.name);
+    const current = accountName ? balances[accountName] ?? 0 : 0;
+    const delta = (type === 'IN' ? 1 : -1) * (Number(amount) || 0);
+    const canSave = !!accountName && Number(amount) > 0 && !!date;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!accountName || !amount || !date) return;
-
-        setLoading(true);
-        const { error } = await supabase.from('pantagon_financial_transactions').insert([{
-            account_name: accountName,
-            type,
-            amount: Number(amount),
-            date,
-            tag: tag || null,
-            note: note || null
+        if (!canSave) return;
+        setSaving(true);
+        const { error } = await db.from('pantagon_financial_transactions').insert([{
+            account_name: accountName, type, amount: Number(amount), date,
+            tag: tag || null, note: note || null,
         }]);
-        setLoading(false);
-
-        if (error) {
-            toast.error('Failed to save transaction', { description: error.message });
-        } else {
-            toast.success('Transaction saved');
-            navigate('/');
-        }
+        setSaving(false);
+        if (error) toast.error('Could not save transaction', { description: error.message });
+        else { toast.success(type === 'IN' ? 'Income saved' : 'Expense saved'); navigate(-1); }
     };
 
-    const isIn = type === 'IN';
-
     return (
-        <div className="pt-4 pb-24">
-            {/* Back button */}
-            <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-cyan-400 transition-colors mb-4 tracking-[0.1em]"
-            >
-                <ChevronLeft className="size-3.5" />
-                BACK
-            </button>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <Segmented
+                value={type} onChange={setType}
+                options={[{ value: 'OUT', label: 'Expense', tone: 'out' }, { value: 'IN', label: 'Income', tone: 'in' }]}
+            />
 
-            <div className="border border-border/30 bg-gray-100 dark:bg-[oklch(0.11_0.014_255)] flex flex-col gap-5 overflow-visible">
-                {/* Page header */}
-                <div className="px-4 pt-4">
-                    <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground font-bold">New Transaction</p>
-                </div>
+            <Field label="Amount (THB)">
+                <input
+                    type="number" inputMode="decimal" step="0.01" min="0.01" required autoFocus
+                    value={amount}
+                    onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0.00"
+                    className={cn(fieldClass, 'h-16 text-[34px] font-semibold tabular-nums')}
+                />
+            </Field>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-4 pb-4">
-                    {/* Type Toggle — rectangle style */}
-                    <div className="grid grid-cols-2 gap-0 border border-border/30">
-                        {(['IN', 'OUT'] as const).map((t) => {
-                            const isSelected = type === t;
-                            const isInType = t === 'IN';
-                            return (
-                                <button
-                                    key={t}
-                                    type="button"
-                                    onClick={() => setType(t)}
-                                    className={cn(
-                                        'flex items-center justify-center gap-2 py-3 px-3 transition-all text-xs font-bold tracking-[0.1em]',
-                                        isSelected
-                                            ? isInType
-                                                ? 'bg-emerald-500/12 border-r border-border/20 text-emerald-400'
-                                                : 'bg-rose-500/12 text-rose-400'
-                                            : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/3 border-r border-border/20 last:border-r-0'
-                                    )}
-                                >
-                                    <div className={cn(
-                                        'size-5 rounded-full flex items-center justify-center border',
-                                        isSelected
-                                            ? isInType ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-rose-500/20 border-rose-500/40'
-                                            : 'bg-white/5 border-border/20'
-                                    )}>
-                                        {isInType
-                                            ? <ArrowDownLeft className={cn('size-3', isSelected ? 'text-emerald-400' : 'text-muted-foreground')} />
-                                            : <ArrowUpRight className={cn('size-3', isSelected ? 'text-rose-400' : 'text-muted-foreground')} />
-                                        }
-                                    </div>
-                                    {isInType ? 'INCOME' : 'EXPENSE'}
-                                </button>
-                            );
-                        })}
-                    </div>
+            <AccountPicker
+                label="Account" value={accountName} onChange={setAccountName}
+                accounts={accounts.map(a => a.name)} balances={balances}
+                hint={accountName && (
+                    <p className="text-[13px] text-muted-foreground tabular-nums">
+                        Now {fmtTHB(current)}
+                        {delta !== 0 && <> → <span className={cn('font-medium', delta > 0 ? 'text-emerald-500' : 'text-rose-500')}>{fmtTHB(current + delta)}</span></>}
+                    </p>
+                )}
+            />
 
-                    {/* Amount */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.14em]">
-                            Amount (THB)
-                        </label>
-                        <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50" />
-                            <Input
-                                type="number"
-                                value={amount}
-                                onChange={(e) => setAmount(Number(e.target.value) || '')}
-                                className="pl-8 text-lg font-black rounded-none border-border/30 bg-black/20 h-11 focus-visible:border-cyan-500/40 focus-visible:ring-cyan-500/10"
-                                placeholder="0.00"
-                                step="0.01"
-                                min="0.01"
-                                required
-                            />
-                        </div>
-                    </div>
+            <Field label="Date">
+                <input type="date" required value={date} onChange={e => setDate(e.target.value)} className={fieldClass} />
+            </Field>
 
-                    {/* Account — custom dropdown */}
-                    <div className="flex flex-col gap-1.5 relative">
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.14em]">
-                            Account
-                        </label>
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setAccountOpen(!accountOpen); }}
-                            className={cn(
-                                'w-full h-10 flex items-center justify-between px-3 border text-sm font-bold transition-all text-left rounded-none',
-                                accountOpen ? 'border-cyan-500/40 bg-black/30 text-foreground' : 'border-border/30 bg-black/20 text-foreground',
-                                !accountName && 'text-muted-foreground font-normal'
-                            )}
-                        >
-                            {accountName ? <AccountOption name={accountName} /> : <span>Select account</span>}
-                            <ChevronDown className={cn('size-3.5 text-muted-foreground transition-transform shrink-0', accountOpen && 'rotate-180')} />
-                        </button>
+            <Field label="Tag (optional)">
+                <input type="text" value={tag} onChange={e => setTag(e.target.value)} placeholder="Food, Transport, Salary…" className={fieldClass} />
+            </Field>
 
-                        {/* Dropdown list — rendered in portal-like fixed position within the form */}
-                        {accountOpen && (
-                            <div
-                                className="absolute left-0 right-0 top-[calc(100%+2px)] z-[100] border border-border/40 bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] shadow-2xl"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {accountOptions.map(opt => (
-                                    <button
-                                        key={opt}
-                                        type="button"
-                                        onClick={() => { setAccountName(opt); setAccountOpen(false); }}
-                                        className={cn(
-                                            'w-full text-left px-3 py-2.5 text-sm border-b border-border/20 last:border-b-0 transition-colors',
-                                            accountName === opt
-                                                ? 'text-cyan-300 bg-cyan-500/8 font-bold'
-                                                : 'text-foreground hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
-                                        )}
-                                    >
-                                        <AccountOption name={opt} />
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+            <Field label="Note (optional)">
+                <textarea
+                    value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Add details"
+                    className={cn(fieldClass, 'h-auto py-3 resize-none')}
+                />
+            </Field>
 
-                    {/* Date */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.14em]">
-                            Date
-                        </label>
-                        <Input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            required
-                            className="rounded-none border-border/30 bg-black/20 h-10 text-sm focus-visible:border-cyan-500/40"
-                        />
-                    </div>
-
-                    {/* Tag */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.14em]">
-                            Tag <span className="text-muted-foreground/40 normal-case tracking-normal font-normal">(optional)</span>
-                        </label>
-                        <div className="relative">
-                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/40" />
-                            <Input
-                                type="text"
-                                value={tag}
-                                onChange={(e) => setTag(e.target.value)}
-                                className="pl-8 rounded-none border-border/30 bg-black/20 h-10 text-sm focus-visible:border-cyan-500/40"
-                                placeholder="Food, Transport, Salary…"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Note */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.14em]">
-                            Note <span className="text-muted-foreground/40 normal-case tracking-normal font-normal">(optional)</span>
-                        </label>
-                        <div className="relative">
-                            <FileText className="absolute left-3 top-3 size-3.5 text-muted-foreground/40" />
-                            <textarea
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                className="w-full pl-8 pr-3 py-2.5 bg-black/20 border border-border/30 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/10 resize-none min-h-[64px] font-mono rounded-none"
-                                placeholder="Add details…"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Submit — rectangle button */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className={cn(
-                            'w-full h-11 text-xs font-bold tracking-[0.14em] border transition-all rounded-none',
-                            isIn
-                                ? 'bg-emerald-500/12 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/35 hover:border-emerald-400/55'
-                                : 'bg-rose-500/12 hover:bg-rose-500/20 text-rose-300 border-rose-500/35 hover:border-rose-400/55'
-                        )}
-                    >
-                        {loading ? (
-                            <span className="flex items-center justify-center gap-2">
-                                <Loader2 className="size-3.5 animate-spin" />
-                                SAVING…
-                            </span>
-                        ) : (
-                            `+ SAVE ${isIn ? 'INCOME' : 'EXPENSE'}`
-                        )}
-                    </button>
-                </form>
-            </div>
-        </div>
+            <PrimaryButton type="submit" disabled={!canSave} loading={saving}>
+                Save {type === 'IN' ? 'income' : 'expense'}
+            </PrimaryButton>
+        </form>
     );
 }

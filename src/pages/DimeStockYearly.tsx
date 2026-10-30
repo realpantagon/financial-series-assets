@@ -1,10 +1,11 @@
 ﻿import { useEffect, useState, useMemo } from 'react';
+import { Chips } from '@/components/ios';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import {
     BarChart, Bar, ComposedChart, Line, XAxis, YAxis,
     Tooltip as RCTip, ResponsiveContainer, ReferenceLine, Cell,
@@ -27,7 +28,7 @@ const AXIS_TICK = { fontSize: 9, fill: '#475569', fontFamily: 'JetBrains Mono, m
 function ChartTip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+        <div className="bg-card border border-border/30 px-2.5 py-2 text-xs font-mono shadow-lg rounded-xl">
             <p className="text-muted-foreground/60 mb-1">{label}</p>
             {payload.map((p: any, i: number) => p.value != null && (
                 <p key={i} style={{ color: p.color ?? p.fill }}>
@@ -40,10 +41,10 @@ function ChartTip({ active, payload, label }: any) {
 
 function SC({ label, value, sub, cls }: { label: string; value: React.ReactNode; sub?: string; cls?: string }) {
     return (
-        <div className="bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] border border-border/20 p-3">
-            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.14em] mb-0.5">{label}</p>
-            <p className={cn('font-mono font-black text-sm leading-snug', cls)}>{value}</p>
-            {sub && <p className="text-[9px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
+        <div className="bg-card border border-border/20 p-3 rounded-xl">
+            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-0.5">{label}</p>
+            <p className={cn('font-mono font-semibold text-sm leading-snug', cls)}>{value}</p>
+            {sub && <p className="text-[11px] font-mono text-muted-foreground/35 mt-0.5">{sub}</p>}
         </div>
     );
 }
@@ -57,7 +58,7 @@ export default function DimeStockYearly() {
     const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
     useEffect(() => {
-        supabase.from('dime_trades').select('*').eq('asset_class', 'STOCK').order('trade_date').then(({ data, error }) => {
+        db.from('dime_trades').select('*').eq('asset_class', 'STOCK').order('trade_date').then(({ data, error }) => {
             if (error) toast.error('Failed to load trades', { description: error.message });
             else {
                 setTransactions((data as DimeTransaction[]) ?? []);
@@ -229,19 +230,12 @@ export default function DimeStockYearly() {
     return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
 
-            {/* Back */}
-            <button onClick={() => navigate('/dime-stock')}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-cyan-400 transition-colors self-start tracking-[0.1em]">
-                <ChevronLeft className="size-3.5" />
-                PORTFOLIO
-            </button>
-
-            {/* Header */}
+{/* Header */}
             <div className="flex items-center gap-3">
                 <Calendar className="size-5 text-cyan-400/60" />
                 <div>
-                    <h1 className="font-black text-lg text-foreground tracking-tighter">Yearly Breakdown</h1>
-                    <p className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">
+                    <h1 className="font-semibold text-lg text-foreground er">Yearly Breakdown</h1>
+                    <p className="text-[11px] font-mono text-muted-foreground/40">
                         {years.length} years · {transactions.length} total trades
                     </p>
                 </div>
@@ -249,8 +243,8 @@ export default function DimeStockYearly() {
 
             {/* All-years P&L bar */}
             {yearlyStats.length > 0 && (
-                <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
-                    <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Realized P&L by Year</p>
+                <div className="border border-border/20 bg-card p-3 rounded-xl">
+                    <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Realized P&L by Year</p>
                     <ResponsiveContainer width="100%" height={120}>
                         <BarChart data={yearlyStats} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                             <XAxis dataKey="year" tick={AXIS_TICK} />
@@ -268,43 +262,40 @@ export default function DimeStockYearly() {
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
-                    <p className="text-[8px] font-mono text-muted-foreground/25 mt-1 text-center">tap bar to select year</p>
+                    <p className="text-[11px] font-mono text-muted-foreground/25 mt-1 text-center">tap bar to select year</p>
                 </div>
             )}
 
-            {/* Year selector chips */}
-            <div className="flex gap-2 flex-wrap">
-                {years.map(y => {
+            {/* Year selector */}
+            <Chips
+                value={selectedYear ?? ""}
+                onChange={(y) => setSelectedYear(y)}
+                options={years.map(y => {
                     const yd = yearlyStats.find(x => x.year === y)!;
-                    return (
-                        <button key={y} onClick={() => setSelectedYear(y)}
-                            className={cn(
-                                'flex flex-col items-center px-4 py-2 border transition-all',
-                                selectedYear === y
-                                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                                    : 'bg-black/20 border-border/20 text-muted-foreground/50 hover:border-border/40'
-                            )}>
-                            <span className="font-mono font-black text-base">{y}</span>
-                            <span className={cn('text-[9px] font-mono font-bold',
-                                yd.realizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            )}>
-                                {yd.realizedPL >= 0 ? '+' : ''}{d$(yd.realizedPL, 0)}
-                            </span>
-                        </button>
-                    );
+                    return {
+                        value: y,
+                        label: (
+                            <>
+                                {y}
+                                <span className={cn('text-[13px] group-data-[state=on]:text-primary-foreground', yd.realizedPL >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
+                                    {yd.realizedPL >= 0 ? '+' : ''}{d$(yd.realizedPL, 0)}
+                                </span>
+                            </>
+                        ),
+                    };
                 })}
-            </div>
+            />
 
             {/* Selected year detail */}
             {selected && (
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-2">
-                        <h2 className="font-mono font-black text-2xl text-foreground">{selected.year}</h2>
-                        <span className={cn('font-mono font-bold text-sm',
+                        <h2 className="font-mono font-semibold text-2xl text-foreground">{selected.year}</h2>
+                        <span className={cn('font-mono font-semibold text-sm',
                             selected.realizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400'
                         )}>
                             {selected.realizedPL >= 0 ? '+' : ''}{d$(selected.realizedPL)}
-                            <span className="text-[10px] ml-1 opacity-70">{pct(selected.realizedPLPct)}</span>
+                            <span className="text-xs ml-1 opacity-70">{pct(selected.realizedPLPct)}</span>
                         </span>
                         {selected.realizedPL >= 0
                             ? <TrendingUp className="size-4 text-emerald-400/60" />
@@ -341,8 +332,8 @@ export default function DimeStockYearly() {
 
                     {/* Monthly P&L chart */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Monthly P&L — {selected.year}</p>
+                        <div className="border border-border/20 bg-card p-3 rounded-xl">
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Monthly P&L — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={150}>
                                 <ComposedChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={AXIS_TICK} />
@@ -363,8 +354,8 @@ export default function DimeStockYearly() {
 
                     {/* Buy vs Sell by month */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Buy vs Sell — {selected.year}</p>
+                        <div className="border border-border/20 bg-card p-3 rounded-xl">
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Buy vs Sell — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={130}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={AXIS_TICK} />
@@ -379,8 +370,8 @@ export default function DimeStockYearly() {
 
                     {/* Fee by month */}
                     {monthlyData.length > 0 && (
-                        <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] p-3">
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-3">Fees by Month — {selected.year}</p>
+                        <div className="border border-border/20 bg-card p-3 rounded-xl">
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-3">Fees by Month — {selected.year}</p>
                             <ResponsiveContainer width="100%" height={100}>
                                 <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="label" tick={AXIS_TICK} />
@@ -395,16 +386,16 @@ export default function DimeStockYearly() {
                     {/* Top / bottom symbols */}
                     {selected.topSymbols.length > 0 && (
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="border border-emerald-500/15 bg-emerald-500/5 p-3">
-                                <p className="text-[8px] font-bold text-emerald-400/50 uppercase tracking-[0.14em] mb-2">Best {selected.year}</p>
+                            <div className="border border-emerald-500/15 bg-emerald-500/5 p-3 rounded-xl">
+                                <p className="text-[11px] font-semibold text-emerald-400/50 mb-2">Best {selected.year}</p>
                                 <div className="flex flex-col gap-1.5">
                                     {selected.topSymbols.filter(s => s.pl > 0).slice(0, 4).map(s => {
                                         const maxPL = selected.topSymbols.filter(x => x.pl > 0)[0]?.pl ?? 1;
                                         return (
                                             <div key={s.sym}>
                                                 <div className="flex justify-between mb-0.5">
-                                                    <span className="font-mono font-black text-[10px] text-foreground/90">{s.sym}</span>
-                                                    <span className="font-mono text-[9px] text-emerald-400">+{d$(s.pl, 0)}</span>
+                                                    <span className="font-mono font-semibold text-xs text-foreground/90">{s.sym}</span>
+                                                    <span className="font-mono text-[11px] text-emerald-400">+{d$(s.pl, 0)}</span>
                                                 </div>
                                                 <div className="h-0.5 bg-border/15 rounded-full overflow-hidden">
                                                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(s.pl / maxPL) * 100}%` }} />
@@ -414,16 +405,16 @@ export default function DimeStockYearly() {
                                     })}
                                 </div>
                             </div>
-                            <div className="border border-rose-500/15 bg-rose-500/5 p-3">
-                                <p className="text-[8px] font-bold text-rose-400/50 uppercase tracking-[0.14em] mb-2">Worst {selected.year}</p>
+                            <div className="border border-rose-500/15 bg-rose-500/5 p-3 rounded-xl">
+                                <p className="text-[11px] font-semibold text-rose-400/50 mb-2">Worst {selected.year}</p>
                                 <div className="flex flex-col gap-1.5">
                                     {selected.bottomSymbols.filter(s => s.pl < 0).slice(0, 4).map(s => {
                                         const maxLoss = Math.abs(selected.bottomSymbols.filter(x => x.pl < 0)[0]?.pl ?? 1);
                                         return (
                                             <div key={s.sym}>
                                                 <div className="flex justify-between mb-0.5">
-                                                    <span className="font-mono font-black text-[10px] text-foreground/90">{s.sym}</span>
-                                                    <span className="font-mono text-[9px] text-rose-400">{d$(s.pl, 0)}</span>
+                                                    <span className="font-mono font-semibold text-xs text-foreground/90">{s.sym}</span>
+                                                    <span className="font-mono text-[11px] text-rose-400">{d$(s.pl, 0)}</span>
                                                 </div>
                                                 <div className="h-0.5 bg-border/15 rounded-full overflow-hidden">
                                                     <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(Math.abs(s.pl) / maxLoss) * 100}%` }} />
@@ -439,10 +430,10 @@ export default function DimeStockYearly() {
                     {/* All symbols for this year */}
                     {yearSymbols.length > 0 && (
                         <div>
-                            <p className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-2">
+                            <p className="text-[11px] font-semibold text-muted-foreground/40 mb-2">
                                 All Symbols — {selected.year} ({yearSymbols.length})
                             </p>
-                            <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.105_0.014_255)] divide-y divide-border/10">
+                            <div className="border border-border/20 bg-card divide-y divide-border/10">
                                 {yearSymbols.map(s => (
                                     <button
                                         key={s.sym}
@@ -450,16 +441,16 @@ export default function DimeStockYearly() {
                                         className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/[0.02] transition-colors text-left"
                                     >
                                         <div>
-                                            <span className="font-mono font-black text-sm text-foreground">{s.sym}</span>
-                                            <span className="ml-2 text-[9px] font-mono text-muted-foreground/40">{s.trades}T</span>
+                                            <span className="font-mono font-semibold text-sm text-foreground">{s.sym}</span>
+                                            <span className="ml-2 text-[11px] font-mono text-muted-foreground/40">{s.trades}T</span>
                                         </div>
                                         <div className="text-right">
                                             {s.hasSells ? (
-                                                <span className={cn('font-mono font-bold text-sm', s.pl >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                                                <span className={cn('font-mono font-semibold text-sm', s.pl >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
                                                     {s.pl >= 0 ? '+' : ''}{d$(s.pl, 0)}
                                                 </span>
                                             ) : (
-                                                <span className="text-[9px] font-mono text-muted-foreground/30">buys only</span>
+                                                <span className="text-[11px] font-mono text-muted-foreground/30">buys only</span>
                                             )}
                                         </div>
                                     </button>
@@ -470,21 +461,21 @@ export default function DimeStockYearly() {
 
                     {/* Year comparison note */}
                     {yearlyStats.length > 1 && (
-                        <div className="border border-border/15 bg-black/20 p-3">
-                            <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.14em] mb-2">Compare All Years</p>
+                        <div className="border border-border/15 bg-muted p-3 rounded-xl">
+                            <p className="text-[11px] font-semibold text-muted-foreground/35 mb-2">Compare All Years</p>
                             <div className="flex flex-col gap-1.5">
                                 {yearlyStats.map(y => (
                                     <button key={y.year} onClick={() => setSelectedYear(y.year)}
                                         className={cn('flex items-center justify-between py-1.5 px-2 transition-colors',
                                             y.year === selectedYear ? 'bg-cyan-500/10' : 'hover:bg-white/[0.03]'
                                         )}>
-                                        <span className={cn('font-mono font-black text-sm', y.year === selectedYear ? 'text-cyan-300' : 'text-foreground/70')}>{y.year}</span>
+                                        <span className={cn('font-mono font-semibold text-sm', y.year === selectedYear ? 'text-cyan-300' : 'text-foreground/70')}>{y.year}</span>
                                         <div className="flex items-center gap-4 font-mono text-xs">
                                             <span className="text-muted-foreground/40">{y.tradeCount}T · {y.symbolCount}sym</span>
-                                            <span className={y.realizedPL >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                            <span className={y.realizedPL >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
                                                 {y.realizedPL >= 0 ? '+' : ''}{d$(y.realizedPL, 0)}
                                             </span>
-                                            <span className={cn('text-[10px]', y.realizedPLPct >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60')}>
+                                            <span className={cn('text-xs', y.realizedPLPct >= 0 ? 'text-emerald-400/60' : 'text-rose-400/60')}>
                                                 {pct(y.realizedPLPct)}
                                             </span>
                                         </div>

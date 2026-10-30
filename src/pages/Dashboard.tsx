@@ -1,204 +1,134 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 import type { FinancialTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { useAccounts, getAccountIcon } from '@/lib/accounts';
-import { ChevronRight, Wallet, Banknote, ArrowRightLeft, Eye, EyeOff } from 'lucide-react';
-import { PinDialog } from '@/components/PinDialog';
+import { cn, fmtTHB } from '@/lib/utils';
+import { useAccounts } from '@/lib/accounts';
+import { Avatar, EmptyState, Group, Money, SectionLabel } from '@/components/ios';
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Banknote, ArrowRightLeft, Plus } from 'lucide-react';
 
-// Code required to reveal balances on the home screen.
-const BALANCE_PIN = '2460';
+const monthKey = (d: string) => d.slice(0, 7);
 
 export default function Dashboard() {
     const navigate = useNavigate();
     const { accounts: catalog } = useAccounts();
-    const [assets, setAssets] = useState<FinancialTransaction[]>([]);
+    const [txs, setTxs] = useState<FinancialTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    // Balances start hidden on every visit; revealing requires the PIN.
-    const [revealed, setRevealed] = useState(false);
-    const [pinOpen, setPinOpen] = useState(false);
 
-    const fetchAssets = useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('pantagon_financial_transactions')
+    useEffect(() => {
+        db.from('pantagon_financial_transactions')
             .select('*')
-            .order('date', { ascending: false });
-        if (error) toast.error('Failed to load transactions', { description: error.message });
-        else setAssets(data || []);
-        setLoading(false);
+            .order('date', { ascending: false })
+            .then(({ data, error }: { data: FinancialTransaction[] | null; error: { message: string } | null }) => {
+                if (error) toast.error('Could not load transactions', { description: error.message });
+                else setTxs(data || []);
+                setLoading(false);
+            });
     }, []);
 
-    useEffect(() => { fetchAssets(); }, [fetchAssets]);
-
-    const totalAssetValue = useMemo(
-        () => assets.reduce((sum, item) => sum + (item.type === 'IN' ? Number(item.amount) : -Number(item.amount)), 0),
-        [assets]
-    );
-
-    const accounts = useMemo(() => {
-        const accountMap: Record<string, number> = {};
-        assets.forEach(item => {
-            const signed = item.type === 'IN' ? Number(item.amount) : -Number(item.amount);
-            const acc = item.account_name || 'Unassigned';
-            accountMap[acc] = (accountMap[acc] || 0) + signed;
+    const { total, accounts, monthIn, monthOut } = useMemo(() => {
+        const map: Record<string, { balance: number; count: number }> = {};
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        let total = 0, monthIn = 0, monthOut = 0;
+        txs.forEach(t => {
+            const amt = Number(t.amount);
+            const signed = t.type === 'IN' ? amt : -amt;
+            total += signed;
+            const a = (map[t.account_name || 'Unassigned'] ??= { balance: 0, count: 0 });
+            a.balance += signed;
+            a.count += 1;
+            if (monthKey(t.date) === thisMonth && t.tag !== 'Transfer') {
+                if (t.type === 'IN') monthIn += amt; else monthOut += amt;
+            }
         });
-        // Order by the account catalog's display_order; unknown accounts sink to the bottom.
-        const orderOf = (name: string) => {
-            const hit = catalog.find(c => c.name === name);
-            return hit ? hit.display_order : 9999;
-        };
-        return Object.keys(accountMap)
-            .map(name => ({ name, balance: accountMap[name] }))
-            .sort((a, b) => {
-                const r = orderOf(a.name) - orderOf(b.name);
-                return r !== 0 ? r : b.balance - a.balance;
-            });
-    }, [assets, catalog]);
-
-    const formatCurrency = (value: number) =>
-        value.toLocaleString('en-US', { style: 'currency', currency: 'THB' });
-
-    // Mask amounts until the PIN is entered.
-    const showAmount = (value: number) => (revealed ? formatCurrency(value) : '••••••');
-
-    // Eye toggle: hide instantly, but require the PIN to reveal.
-    const toggleReveal = () => {
-        if (revealed) setRevealed(false);
-        else setPinOpen(true);
-    };
+        const orderOf = (n: string) => catalog.find(c => c.name === n)?.display_order ?? 9999;
+        const accounts = Object.entries(map)
+            .map(([name, v]) => ({ name, ...v }))
+            .sort((a, b) => orderOf(a.name) - orderOf(b.name) || b.balance - a.balance);
+        return { total, accounts, monthIn, monthOut };
+    }, [txs, catalog]);
 
     if (loading) {
         return (
-            <div className="flex flex-col gap-3 pt-4 pb-20">
-                <Skeleton className="h-28 w-full rounded-xl" />
-                <div className="flex flex-col gap-2">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
-                </div>
+            <div className="flex flex-col gap-3">
+                <Skeleton className="h-40 w-full rounded-3xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
             </div>
         );
     }
 
+    const actions = [
+        { label: 'Add', icon: Plus, to: '/add' },
+        { label: 'Transfer', icon: ArrowRightLeft, to: '/transfer' },
+        { label: 'Salary', icon: Banknote, to: '/salary' },
+    ];
+
     return (
-        <div className="flex flex-col gap-3 pb-20 pt-4">
-            {/* Net Worth Hero */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.12_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.015_240)] p-5 relative overflow-hidden">
-                <div className="h-px w-full absolute top-0 left-0 bg-gradient-to-r from-cyan-500/50 via-cyan-400/15 to-transparent" />
-                <div className="flex items-center justify-between mb-1 relative">
-                    <p className="text-[8px] uppercase tracking-[0.16em] text-muted-foreground/40 font-bold">
-                        Total Net Worth
-                    </p>
+        <div className="flex flex-col">
+            {/* Net worth */}
+            <section className="rounded-3xl bg-card px-5 pt-5 pb-4">
+                <p className="text-[13px] font-medium text-muted-foreground">Net worth</p>
+                <Money value={total} className={cn('mt-2', total < 0 && 'text-rose-500')} />
+                <div className="mt-5 pt-4 border-t border-border/60 grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">
+                            <ArrowDownLeft className="size-4 text-emerald-500" /> In this month
+                        </p>
+                        <p className="mt-1 text-[22px] font-semibold tabular-nums text-emerald-500">{fmtTHB(monthIn, { decimals: 0 })}</p>
+                    </div>
+                    <div>
+                        <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">
+                            <ArrowUpRight className="size-4 text-rose-500" /> Out this month
+                        </p>
+                        <p className="mt-1 text-[22px] font-semibold tabular-nums text-rose-500">{fmtTHB(monthOut, { decimals: 0 })}</p>
+                    </div>
+                </div>
+            </section>
+
+            {/* Quick actions */}
+            <div className="grid grid-cols-3 gap-3 mt-3">
+                {actions.map(({ label, icon: Icon, to }) => (
                     <button
-                        onClick={toggleReveal}
-                        className="flex items-center justify-center size-7 -mr-1.5 -mt-1.5 rounded-md text-muted-foreground/50 hover:text-cyan-400 transition-colors"
-                        aria-label={revealed ? 'Hide balances' : 'Show balances'}
+                        key={to}
+                        onClick={() => navigate(to)}
+                        className="press h-[76px] rounded-2xl bg-card flex flex-col items-center justify-center gap-1.5 text-[15px] font-medium"
                     >
-                        {revealed
-                            ? <EyeOff className="size-4" strokeWidth={2} />
-                            : <Eye className="size-4" strokeWidth={2} />
-                        }
+                        <Icon className="size-6 text-primary" strokeWidth={1.9} />
+                        {label}
                     </button>
-                </div>
-                <div className="font-mono font-black text-4xl text-foreground tracking-tight relative leading-none">
-                    {showAmount(totalAssetValue)}
-                </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/15 relative">
-                    <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">{accounts.length} accounts</span>
-                    <span className="text-border/30 text-[9px]">·</span>
-                    <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">{assets.length} transactions</span>
-                </div>
+                ))}
             </div>
 
-            {/* Salary allocation quick action */}
-            <button
-                onClick={() => navigate('/salary')}
-                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-card hover:border-cyan-500/35 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] rounded-xl"
-            >
-                <div className="size-9 rounded-full bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
-                    <Banknote className="size-4 text-cyan-400" />
-                </div>
-                <span className="font-bold text-sm text-foreground flex-1 text-left">Salary Allocation</span>
-                <ChevronRight className="size-3.5 text-muted-foreground/20" />
-            </button>
-
-            {/* Transfer between accounts quick action */}
-            <button
-                onClick={() => navigate('/transfer')}
-                className="w-full flex items-center gap-3 p-3.5 border border-cyan-500/15 bg-card hover:border-cyan-500/35 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] rounded-xl"
-            >
-                <div className="size-9 rounded-full bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0">
-                    <ArrowRightLeft className="size-4 text-cyan-400" />
-                </div>
-                <span className="font-bold text-sm text-foreground flex-1 text-left">Transfer Between Accounts</span>
-                <ChevronRight className="size-3.5 text-muted-foreground/20" />
-            </button>
-
-            {/* Accounts label */}
-            <span className="text-[8px] font-bold text-muted-foreground/30 uppercase tracking-[0.16em] px-1 mt-1">
+            <SectionLabel right={<span className="text-[13px] text-muted-foreground">{accounts.length} accounts</span>}>
                 Accounts
-            </span>
+            </SectionLabel>
 
             {accounts.length === 0 ? (
-                <div className="border border-dashed border-border/20 rounded-xl py-10 text-center text-muted-foreground/30 text-xs tracking-wider">
-                    NO ACCOUNTS YET
-                </div>
-            ) : accounts.map((acc) => {
-                const icon = getAccountIcon(acc.name);
-                const txCount = assets.filter(a => a.account_name === acc.name).length;
-                const isNegative = acc.balance < 0;
-
-                return (
-                    <button
-                        key={acc.name}
-                        onClick={() => navigate(`/account/${encodeURIComponent(acc.name)}`)}
-                        className="w-full text-left border border-border/25 rounded-xl bg-card hover:border-border/50 hover:bg-accent/60 transition-all duration-150 active:scale-[0.99] overflow-hidden group"
-                    >
-                        <div className="flex items-center gap-3 p-3.5">
-                            {/* Icon */}
-                            <div className={cn(
-                                'size-9 rounded-full overflow-hidden border flex-shrink-0 flex items-center justify-center',
-                                icon ? 'border-border/25 bg-black/20' : isNegative ? 'border-rose-500/15 bg-rose-500/8' : 'border-cyan-500/15 bg-cyan-500/8'
-                            )}>
-                                {icon ? (
-                                    <>
-                                        <img src={icon} alt={acc.name} className="w-full h-full object-cover"
-                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
-                                        <Wallet className={cn('size-4 hidden', isNegative ? 'text-rose-400' : 'text-cyan-400')} />
-                                    </>
-                                ) : (
-                                    <Wallet className={cn('size-4', isNegative ? 'text-rose-400' : 'text-muted-foreground/40')} />
-                                )}
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                                <span className="font-bold text-sm text-foreground truncate">{acc.name}</span>
-                                <span className="text-[9px] font-mono text-muted-foreground/40 tracking-wider">{txCount} tx</span>
-                            </div>
-
-                            {/* Balance */}
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={cn('font-mono font-black text-sm', isNegative ? 'text-rose-400' : 'text-foreground')}>
-                                    {showAmount(acc.balance)}
-                                </span>
-                                <ChevronRight className="size-3.5 text-muted-foreground/20 group-hover:text-cyan-400/40 transition-colors" />
-                            </div>
-                        </div>
-                    </button>
-                );
-            })}
-
-            <PinDialog
-                open={pinOpen}
-                onOpenChange={setPinOpen}
-                correctPin={BALANCE_PIN}
-                onSuccess={() => setRevealed(true)}
-                title="Show Balances"
-                description="Enter your 4-digit code to reveal amounts"
-            />
+                <EmptyState title="No accounts yet" body="Add your first transaction to start tracking." />
+            ) : (
+                <Group>
+                    {accounts.map(acc => (
+                        <button
+                            key={acc.name}
+                            onClick={() => navigate(`/account/${encodeURIComponent(acc.name)}`)}
+                            className="press w-full flex items-center gap-3 px-4 min-h-[64px] text-left"
+                        >
+                            <Avatar name={acc.name} size={40} />
+                            <span className="flex-1 min-w-0">
+                                <span className="block truncate text-[17px] font-medium">{acc.name}</span>
+                                <span className="block text-[13px] text-muted-foreground">{acc.count} transactions</span>
+                            </span>
+                            <span className={cn('text-[17px] font-semibold tabular-nums', acc.balance < 0 && 'text-rose-500')}>
+                                {fmtTHB(acc.balance)}
+                            </span>
+                            <ChevronRight className="size-4 text-muted-foreground/60 shrink-0" />
+                        </button>
+                    ))}
+                </Group>
+            )}
         </div>
     );
 }

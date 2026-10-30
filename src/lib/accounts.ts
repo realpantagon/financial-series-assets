@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 
 export interface FinancialAccount {
     id: number;
@@ -28,7 +28,7 @@ export function getAccountIcon(accountName: string | null | undefined): string |
 }
 
 export async function fetchAccounts(opts: { onlyActive?: boolean } = { onlyActive: true }): Promise<FinancialAccount[]> {
-    let query = supabase
+    let query = db
         .from('pantagon_financial_accounts')
         .select('*')
         .order('display_order', { ascending: true })

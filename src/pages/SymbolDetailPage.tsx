@@ -1,10 +1,10 @@
 ﻿import { useCallback, useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { useParams } from 'react-router-dom';
+import { db } from '../db';
 import type { DimeTransaction } from '../types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RCTip,
     ResponsiveContainer, ReferenceLine,
@@ -26,7 +26,7 @@ function formatDate(dateString: string): string {
 function SidePill({ side }: { side: string }) {
     return (
         <span className={cn(
-            'inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono border tracking-wider',
+            'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold font-mono border ',
             side === 'BUY' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25' :
                              'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
         )}>
@@ -38,7 +38,7 @@ function SidePill({ side }: { side: string }) {
 function FeePill({ label, value }: { label: string; value: number | null | undefined }) {
     if (!value || value <= 0) return null;
     return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/6 text-amber-400/70 border border-amber-500/12">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-xl text-[11px] font-mono bg-amber-500/6 text-amber-400/70 border border-amber-500/12">
             {label} {fmt(value, 4)}
         </span>
     );
@@ -47,8 +47,8 @@ function FeePill({ label, value }: { label: string; value: number | null | undef
 function Stat({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
     return (
         <div>
-            <p className="text-[8px] font-bold text-muted-foreground/50 uppercase tracking-[0.14em] mb-0.5">{label}</p>
-            <p className={cn('font-mono font-bold text-sm', className)}>{value}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground/50 mb-0.5">{label}</p>
+            <p className={cn('font-mono font-semibold text-sm', className)}>{value}</p>
         </div>
     );
 }
@@ -57,12 +57,11 @@ function Stat({ label, value, className }: { label: string; value: React.ReactNo
 
 export default function SymbolDetailPage() {
     const { symbol } = useParams<{ symbol: string }>();
-    const navigate = useNavigate();
     const [transactions, setTransactions] = useState<DimeTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('dime_trades')
             .select('*')
             .eq('asset_class', 'STOCK')
@@ -136,23 +135,16 @@ export default function SymbolDetailPage() {
 
     if (loading) return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
-            <Skeleton className="h-8 w-24 rounded-lg" />
+            <Skeleton className="h-8 w-24 rounded-xl" />
             <Skeleton className="h-44 w-full rounded-xl" />
-            <Skeleton className="h-4 w-36 rounded mx-auto" />
+            <Skeleton className="h-4 w-36 rounded-xl mx-auto" />
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
         </div>
     );
 
     if (!symbol || symTxs.length === 0) return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
-            <button
-                onClick={() => navigate('/dime-stock')}
-                className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors self-start tracking-wider"
-            >
-                <ChevronLeft className="size-3.5" />
-                PORTFOLIO
-            </button>
-            <div className="flex flex-col items-center py-16 text-muted-foreground/40 text-sm">
+<div className="flex flex-col items-center py-16 text-muted-foreground/40 text-sm">
                 No data for {symbol}
             </div>
         </div>
@@ -160,32 +152,24 @@ export default function SymbolDetailPage() {
 
     return (
         <div className="flex flex-col gap-4 pt-4 pb-28">
-            <button
-                onClick={() => navigate('/dime-stock')}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-cyan-400 transition-colors self-start tracking-[0.1em]"
-            >
-                <ChevronLeft className="size-3.5" />
-                PORTFOLIO
-            </button>
-
-            {/* Hero card */}
-            <div className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-sky-50 dark:from-[oklch(0.13_0.02_250)] to-slate-100 dark:to-[oklch(0.09_0.03_230)] overflow-hidden relative">
-                <Activity className="absolute -right-4 -bottom-4 size-28 text-cyan-500/4" />
-                <div className="h-px w-full bg-gradient-to-r from-cyan-500/60 via-cyan-400/20 to-transparent" />
+{/* Hero card */}
+            <div className="rounded-2xl bg-card overflow-hidden relative">
+                <Activity className="absolute -right-4 -bottom-4 size-28 text-cyan-500/5" />
+                <div className="h-px w-full bg-primary/20" />
 
                 <div className="p-5 relative">
                     <div className="flex justify-between items-start mb-5">
                         <div>
-                            <div className="text-[8px] font-bold text-muted-foreground/50 uppercase tracking-[0.16em] mb-1">Symbol</div>
-                            <div className="font-mono font-black text-4xl text-foreground tracking-tighter leading-none">{symbol}</div>
-                            <div className="text-[10px] text-muted-foreground/50 font-mono mt-1.5">
+                            <div className="text-[11px] font-semibold text-muted-foreground/50 mb-1">Symbol</div>
+                            <div className="font-mono font-semibold text-4xl text-foreground er leading-none">{symbol}</div>
+                            <div className="text-xs text-muted-foreground/50 font-mono mt-1.5">
                                 {summary.txCount} trade{summary.txCount !== 1 ? 's' : ''}
                             </div>
                         </div>
                         {realized !== 0 && (
                             <div className="text-right">
-                                <div className="text-[8px] font-bold text-muted-foreground/50 uppercase tracking-[0.16em] mb-1">Net P&L</div>
-                                <div className={cn('font-mono font-black text-2xl', plPositive ? 'text-emerald-400' : 'text-rose-400')}>
+                                <div className="text-[11px] font-semibold text-muted-foreground/50 mb-1">Net P&L</div>
+                                <div className={cn('font-mono font-semibold text-2xl', plPositive ? 'text-emerald-400' : 'text-rose-400')}>
                                     {plPositive ? '+' : ''}{fmt(realized)}
                                 </div>
                                 {plPositive
@@ -197,10 +181,10 @@ export default function SymbolDetailPage() {
                     </div>
 
                     <div className="mb-5">
-                        <div className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em] mb-0.5">Position Value</div>
-                        <div className="font-mono font-black text-3xl text-cyan-300 tracking-tight">{fmt(summary.totalStockAmount)}</div>
+                        <div className="text-[11px] font-semibold text-muted-foreground/40 mb-0.5">Position Value</div>
+                        <div className="font-mono font-semibold text-3xl text-cyan-300">{fmt(summary.totalStockAmount)}</div>
                         {summary.totalShares > 0 && (
-                            <div className="text-[10px] font-mono text-muted-foreground/50 mt-0.5">
+                            <div className="text-xs font-mono text-muted-foreground/50 mt-0.5">
                                 {summary.totalShares.toFixed(7)} sh held
                             </div>
                         )}
@@ -218,8 +202,8 @@ export default function SymbolDetailPage() {
 
             {/* Trade chart */}
             {chartData.length > 1 && (
-                <div className="border border-border/20 bg-gray-50 dark:bg-[oklch(0.10_0.013_255)] p-3">
-                    <p className="text-[8px] font-bold text-muted-foreground/35 uppercase tracking-[0.16em] mb-3">Trade History</p>
+                <div className="border border-border/20 bg-card p-3 rounded-xl">
+                    <p className="text-[11px] font-semibold text-muted-foreground/35 mb-3">Trade History</p>
                     <ResponsiveContainer width="100%" height={160}>
                         <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                             <XAxis dataKey="label"
@@ -231,7 +215,7 @@ export default function SymbolDetailPage() {
                             <RCTip content={({ active, payload, label }: any) => {
                                 if (!active || !payload?.length) return null;
                                 return (
-                                    <div className="bg-slate-50 dark:bg-[oklch(0.13_0.018_255)] border border-border/30 px-2.5 py-2 text-[10px] font-mono shadow-xl">
+                                    <div className="bg-card border border-border/30 px-2.5 py-2 text-xs font-mono shadow-lg rounded-xl">
                                         <p className="text-muted-foreground/60 mb-1">{label}</p>
                                         {payload.map((p: any, i: number) => p.value != null && (
                                             <p key={i} style={{ color: p.color ?? p.fill }}>
@@ -254,8 +238,8 @@ export default function SymbolDetailPage() {
                             { color: '#34d399', label: 'Sell' },
                             { color: '#fbbf24', label: 'Cumul. P&L' },
                         ].map(({ color, label }) => (
-                            <span key={label} className="flex items-center gap-1.5 text-[8px] font-mono text-muted-foreground/40">
-                                <span className="size-2 rounded-sm shrink-0" style={{ background: color }} />
+                            <span key={label} className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground/40">
+                                <span className="size-2 rounded-xl shrink-0" style={{ background: color }} />
                                 {label}
                             </span>
                         ))}
@@ -265,7 +249,7 @@ export default function SymbolDetailPage() {
 
             <div className="flex items-center gap-2 px-1">
                 <div className="h-px flex-1 bg-border/20" />
-                <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-[0.16em]">Transaction Timeline</span>
+                <span className="text-[11px] font-semibold text-muted-foreground/40">Transaction Timeline</span>
                 <div className="h-px flex-1 bg-border/20" />
             </div>
 
@@ -286,19 +270,19 @@ export default function SymbolDetailPage() {
                             <div key={tx.id} className="flex gap-3 relative" style={{ zIndex: 1 }}>
                                 <div className={cn('size-[9px] rounded-full mt-3 shrink-0 ring-2 ring-background', dotColor)} />
 
-                                <div className="flex-1 border border-border/25 rounded-lg bg-white/60 dark:bg-[oklch(0.12_0.015_255/0.6)] p-3 hover:border-border/50 transition-colors group">
+                                <div className="flex-1 rounded-2xl bg-card p-3 hover:border-border/50 transition-colors group">
                                     <div className="flex items-center justify-between mb-1.5">
                                         <div className="flex items-center gap-2">
                                             <SidePill side={tx.side} />
-                                            <span className="text-[10px] text-muted-foreground/60 font-mono">{formatDate(tx.trade_date)}</span>
+                                            <span className="text-xs text-muted-foreground/60 font-mono">{formatDate(tx.trade_date)}</span>
                                         </div>
-                                        <span className={cn('font-mono font-bold text-sm',
+                                        <span className={cn('font-mono font-semibold text-sm',
                                             isBuy ? 'text-foreground' : 'text-emerald-400'
                                         )}>
                                             {fmt(displayAmount)}
                                         </span>
                                     </div>
-                                    <div className="flex flex-wrap gap-1 text-[9px] font-mono text-muted-foreground/50">
+                                    <div className="flex flex-wrap gap-1 text-[11px] font-mono text-muted-foreground/50">
                                         <span>{Number(tx.qty).toFixed(7)} sh</span>
                                         <span>@ {fmt(tx.price)}</span>
                                         {tx.gross_usd != null && Number(tx.gross_usd) > 0 && !isBuy && (

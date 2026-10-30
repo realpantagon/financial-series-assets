@@ -1,18 +1,14 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../db';
 import type { FinancialFX } from '../types';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Group, Segmented } from '@/components/ios';
 import { cn, getErrorMessage } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, X, BarChart2, ArrowRight, Inbox, Loader2 } from 'lucide-react';
 
@@ -20,12 +16,56 @@ const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
+const CURRENCIES = ['THB', 'USD', 'FCD', 'SAVE'];
+const PAGE = 40;
+
+type View = 'all' | 'month';
+
+// Amount colour follows the destination: USD violet, FCD yellow-green, SAVE plain.
+const TO_TONE: Record<string, string> = {
+    USD: 'text-violet-600 dark:text-violet-400',
+    FCD: 'text-lime-700 dark:text-lime-400',
+};
+
+const num = (v: number, d = 2) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function FxRow({ item }: { item: FinancialFX }) {
+    const d = new Date(item.transaction_at);
+    const tone = TO_TONE[item.to_currency] ?? '';
+    return (
+        <div className="flex items-center gap-3 px-4 py-3 min-h-[68px]">
+            <div className="w-11 shrink-0 text-center">
+                <p className="text-[20px] leading-none font-semibold tabular-nums">{d.getDate()}</p>
+                <p className="text-[12px] text-muted-foreground mt-1">{d.toLocaleDateString('en-GB', { month: 'short' })}</p>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="flex items-center gap-1.5 text-[15px] font-medium">
+                    {item.from_currency}
+                    <ArrowRight className="size-3.5 text-muted-foreground" />
+                    {item.to_currency}
+                </p>
+                <p className="text-[13px] text-muted-foreground tabular-nums">
+                    @ {item.exchange_rate.toFixed(4)} · {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+            </div>
+            <div className="text-right">
+                <p className={cn('text-[17px] font-semibold tabular-nums', tone)}>
+                    {num(item.foreign_amount)} <span className="text-[13px] font-medium text-muted-foreground">{item.to_currency}</span>
+                </p>
+                <p className="text-[13px] text-muted-foreground tabular-nums">฿ {num(item.thb_amount)}</p>
+            </div>
+        </div>
+    );
+}
 
 export default function FXPage() {
     const navigate = useNavigate();
     const [data, setData] = useState<FinancialFX[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const [view, setView] = useState<View>('all');
+    const [shown, setShown] = useState(PAGE);
 
     const [showForm, setShowForm] = useState(false);
     const [formLoading, setFormLoading] = useState(false);
@@ -46,7 +86,7 @@ export default function FXPage() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('pantagon_financial_fx')
                 .select('*')
                 .order('transaction_at', { ascending: false });
@@ -54,6 +94,7 @@ export default function FXPage() {
             if (error) throw error;
             setData(data || []);
 
+            // Monthly view opens on the month of the latest record.
             if (data && data.length > 0) {
                 const latestDate = new Date(data[0].transaction_at);
                 setSelectedYear(latestDate.getFullYear());
@@ -78,7 +119,7 @@ export default function FXPage() {
 
             if (!finalRate && foreign > 0 && thb > 0) finalRate = thb / foreign;
 
-            const { error } = await supabase.from('pantagon_financial_fx').insert({
+            const { error } = await db.from('pantagon_financial_fx').insert({
                 transaction_at: new Date(form.transaction_at).toISOString(),
                 from_currency: form.from_currency,
                 to_currency: form.to_currency,
@@ -93,7 +134,7 @@ export default function FXPage() {
             setForm({ transaction_at: new Date().toISOString().slice(0, 16), from_currency: 'THB', to_currency: 'USD', thb_amount: '', foreign_amount: '', exchange_rate: '' });
             fetchData();
         } catch (err) {
-            toast.error('Failed to save', { description: getErrorMessage(err) });
+            toast.error('Could not save', { description: getErrorMessage(err) });
         } finally {
             setFormLoading(false);
         }
@@ -112,26 +153,39 @@ export default function FXPage() {
 
     const availableFromCurrencies = useMemo(() =>
         Array.from(new Set(data.map(item => item.from_currency))).sort(), [data]);
-
     const availableToCurrencies = useMemo(() =>
         Array.from(new Set(data.map(item => item.to_currency))).sort(), [data]);
 
-    const filteredData = useMemo(() => {
-        return data.filter(item => {
-            const date = new Date(item.transaction_at);
-            const matchYear = date.getFullYear() === selectedYear;
-            const matchMonth = date.getMonth() === selectedMonth;
-            const matchFrom = selectedFromCurrency === 'All' || item.from_currency === selectedFromCurrency;
-            const matchTo = selectedToCurrency === 'All' || item.to_currency === selectedToCurrency;
-            return matchYear && matchMonth && matchFrom && matchTo;
+    // Currency filters apply to both views; the month window only to "month".
+    const currencyFiltered = useMemo(() => data.filter(item =>
+        (selectedFromCurrency === 'All' || item.from_currency === selectedFromCurrency) &&
+        (selectedToCurrency === 'All' || item.to_currency === selectedToCurrency)
+    ), [data, selectedFromCurrency, selectedToCurrency]);
+
+    const monthData = useMemo(() => currencyFiltered.filter(item => {
+        const date = new Date(item.transaction_at);
+        return date.getFullYear() === selectedYear && date.getMonth() === selectedMonth;
+    }), [currencyFiltered, selectedYear, selectedMonth]);
+
+    const visibleAll = currencyFiltered.slice(0, shown);
+
+    // Group the "all" list under month headings (data is newest first).
+    const grouped = useMemo(() => {
+        const out: { key: string; label: string; items: FinancialFX[] }[] = [];
+        visibleAll.forEach(item => {
+            const d = new Date(item.transaction_at);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            const last = out[out.length - 1];
+            if (last && last.key === key) last.items.push(item);
+            else out.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, items: [item] });
         });
-    }, [data, selectedYear, selectedMonth, selectedFromCurrency, selectedToCurrency]);
+        return out;
+    }, [visibleAll]);
 
     const handlePrevMonth = () => {
         if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(prev => prev - 1); }
         else setSelectedMonth(prev => prev - 1);
     };
-
     const handleNextMonth = () => {
         if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(prev => prev + 1); }
         else setSelectedMonth(prev => prev + 1);
@@ -139,249 +193,198 @@ export default function FXPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col gap-4 pt-4 pb-24">
-                <Skeleton className="h-10 w-full rounded-xl" />
-                <Skeleton className="h-14 w-full rounded-xl" />
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+            <div className="flex flex-col gap-3">
+                <Skeleton className="h-11 w-full rounded-xl" />
+                {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-[68px] w-full rounded-2xl" />)}
             </div>
         );
     }
 
-    if (error) return (
-        <div className="p-4 text-center text-destructive text-sm pt-20">Error: {error}</div>
+    if (error) return <div className="p-4 text-center text-destructive text-sm pt-20">Error: {error}</div>;
+
+    const emptyState = (
+        <Empty>
+            <EmptyHeader>
+                <EmptyMedia variant="icon"><Inbox /></EmptyMedia>
+                <EmptyTitle>No transactions</EmptyTitle>
+                <EmptyDescription>Nothing matches these filters.</EmptyDescription>
+            </EmptyHeader>
+        </Empty>
     );
 
     return (
-        <div className="flex flex-col gap-4 pb-24 pt-4">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="font-black text-lg text-foreground tracking-tighter">FX</h1>
-                    <span className="text-[9px] text-muted-foreground/40 font-mono tracking-wider">{data.length} records</span>
-                </div>
-                <div className="flex gap-1.5">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate('/fx/analytics')}
-                        className="gap-1.5 text-[10px] font-bold border-border/30 bg-transparent hover:bg-slate-100 dark:hover:bg-white/3 tracking-wider h-8 px-3"
-                    >
-                        <BarChart2 className="size-3" />
-                        ANALYTICS
+        <div className="flex flex-col gap-4">
+            {/* Actions */}
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] text-muted-foreground">{data.length} records</span>
+                <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => navigate('/fx/analytics')}>
+                        <BarChart2 data-icon="inline-start" />
+                        Analytics
                     </Button>
-                    <Button
-                        size="sm"
-                        onClick={() => setShowForm(!showForm)}
-                        className={showForm
-                            ? 'gap-1.5 text-[10px] font-bold border border-rose-500/25 bg-rose-500/10 text-rose-300 hover:bg-rose-500/15 shadow-none h-8 px-3 tracking-wider'
-                            : 'gap-1.5 text-[10px] font-bold border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/15 shadow-none h-8 px-3 tracking-wider'
-                        }
-                    >
-                        {showForm ? <X className="size-3" /> : <Plus className="size-3" />}
-                        {showForm ? 'CANCEL' : 'ADD FX'}
+                    <Button variant={showForm ? 'secondary' : 'default'} onClick={() => setShowForm(!showForm)}>
+                        {showForm ? <X data-icon="inline-start" /> : <Plus data-icon="inline-start" />}
+                        {showForm ? 'Cancel' : 'Add FX'}
                     </Button>
                 </div>
             </div>
 
-            {/* Add Form */}
+            {/* Add form */}
             {showForm && (
-                <div className="rounded-xl border border-border/25 bg-card p-4 animate-in slide-in-from-top-2 duration-200">
-                        <h2 className="text-[9px] uppercase tracking-[0.14em] font-bold text-muted-foreground/40 mb-3">ADD FOREIGN EXCHANGE</h2>
-                        <form onSubmit={handleSave} className="flex flex-col gap-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">From Currency</label>
-                                    <Select
-                                        value={form.from_currency}
-                                        onValueChange={(val) => setForm(prev => ({
-                                            ...prev, from_currency: val,
-                                            to_currency: prev.to_currency === val ? '' : prev.to_currency
-                                        }))}
-                                        required
-                                    >
-                                        <SelectTrigger className="h-9 text-sm font-semibold uppercase">
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {['THB', 'USD', 'FCD', 'SAVE'].map(c => (
-                                                <SelectItem key={c} value={c}>{c}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">To Currency</label>
-                                    <Select
-                                        value={form.to_currency}
-                                        onValueChange={(val) => setForm({ ...form, to_currency: val })}
-                                        required
-                                    >
-                                        <SelectTrigger className="h-9 text-sm font-semibold uppercase">
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {['THB', 'USD', 'FCD', 'SAVE']
-                                                .filter(c => c !== form.from_currency)
-                                                .map(c => (
-                                                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                                                ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">THB Amount</label>
-                                    <Input type="number" step="0.01" value={form.thb_amount} onChange={(e) => setForm({ ...form, thb_amount: e.target.value })} placeholder="0.00" required className="h-9 text-sm font-semibold" />
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Foreign Amount</label>
-                                    <Input type="number" step="0.000001" value={form.foreign_amount} onChange={(e) => setForm({ ...form, foreign_amount: e.target.value })} placeholder="0.00" required className="h-9 text-sm font-semibold" />
-                                </div>
-                            </div>
-
+                <div className="rounded-2xl bg-card p-4 animate-in slide-in-from-top-2 duration-200">
+                    <h2 className="text-[17px] font-semibold mb-4">Add foreign exchange</h2>
+                    <form onSubmit={handleSave} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rate (optional — auto-calculated)</label>
-                                    {liveRate !== null && (
-                                        <span className="text-[10px] font-mono font-bold text-cyan-400">
-                                            1 {form.to_currency || '?'} = {liveRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} THB
-                                        </span>
-                                    )}
-                                </div>
-                                <Input
-                                    type="number"
-                                    step="0.000001"
-                                    value={form.exchange_rate}
-                                    onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })}
-                                    placeholder={liveRate !== null ? liveRate.toFixed(6) : 'Auto'}
-                                    className="h-9 text-sm font-semibold"
-                                />
+                                <label className="text-[13px] font-medium text-muted-foreground">From</label>
+                                <Select
+                                    value={form.from_currency}
+                                    onValueChange={(val) => setForm(prev => ({
+                                        ...prev, from_currency: val,
+                                        to_currency: prev.to_currency === val ? '' : prev.to_currency
+                                    }))}
+                                    required
+                                >
+                                    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Select" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>{CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectGroup>
+                                    </SelectContent>
+                                </Select>
                             </div>
-
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Date & Time</label>
-                                <Input type="datetime-local" value={form.transaction_at} onChange={(e) => setForm({ ...form, transaction_at: e.target.value })} required className="h-9 text-sm" />
+                                <label className="text-[13px] font-medium text-muted-foreground">To</label>
+                                <Select value={form.to_currency} onValueChange={(val) => setForm({ ...form, to_currency: val })} required>
+                                    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Select" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {CURRENCIES.filter(c => c !== form.from_currency).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
                             </div>
+                        </div>
 
-                            <Button type="submit" disabled={formLoading} className="w-full mt-1">
-                                {formLoading ? <><Loader2 className="size-4 animate-spin" data-icon="inline-start" />Saving…</> : 'Save FX Transaction'}
-                            </Button>
-                        </form>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[13px] font-medium text-muted-foreground">THB amount</label>
+                                <Input type="number" inputMode="decimal" step="0.01" value={form.thb_amount} onChange={(e) => setForm({ ...form, thb_amount: e.target.value })} placeholder="0.00" required />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[13px] font-medium text-muted-foreground">Foreign amount</label>
+                                <Input type="number" inputMode="decimal" step="0.000001" value={form.foreign_amount} onChange={(e) => setForm({ ...form, foreign_amount: e.target.value })} placeholder="0.00" required />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="text-[13px] font-medium text-muted-foreground">Rate (optional)</label>
+                                {liveRate !== null && (
+                                    <span className="text-[13px] font-medium text-primary tabular-nums">
+                                        1 {form.to_currency || '?'} = {liveRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} THB
+                                    </span>
+                                )}
+                            </div>
+                            <Input
+                                type="number" inputMode="decimal" step="0.000001"
+                                value={form.exchange_rate}
+                                onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })}
+                                placeholder={liveRate !== null ? liveRate.toFixed(6) : 'Calculated from amounts'}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[13px] font-medium text-muted-foreground">Date & time</label>
+                            <Input type="datetime-local" value={form.transaction_at} onChange={(e) => setForm({ ...form, transaction_at: e.target.value })} required />
+                        </div>
+
+                        <Button type="submit" disabled={formLoading} size="lg" className="w-full h-[52px] rounded-2xl text-[17px]">
+                            {formLoading ? <><Loader2 className="animate-spin" data-icon="inline-start" />Saving…</> : 'Save FX transaction'}
+                        </Button>
+                    </form>
                 </div>
             )}
 
-            {/* Month Selector */}
             {!showForm && (
                 <>
-                    <div className="flex items-center justify-between bg-card border border-border/20 rounded-xl p-2">
-                        <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="size-9">
-                            <ChevronLeft className="size-4" />
-                        </Button>
-                        <div className="text-center">
-                            <div className="font-bold text-base text-foreground">{MONTHS[selectedMonth]}</div>
-                            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                                <SelectTrigger className="h-5 border-0 p-0 text-xs text-muted-foreground font-medium shadow-none focus:ring-0 w-auto">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {(availableYears.length > 0 ? availableYears : [new Date().getFullYear()]).map(y => (
-                                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={handleNextMonth} className="size-9">
-                            <ChevronRight className="size-4" />
-                        </Button>
-                    </div>
+                    {/* Primary view = everything; monthly is the secondary view */}
+                    <Segmented
+                        value={view}
+                        onChange={(v) => { setView(v); setShown(PAGE); }}
+                        options={[{ value: 'all', label: 'All' }, { value: 'month', label: 'Monthly' }]}
+                    />
 
-                    {/* Filters */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <Select value={selectedFromCurrency} onValueChange={setSelectedFromCurrency}>
-                            <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">From: All</SelectItem>
-                                {availableFromCurrencies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedToCurrency} onValueChange={setSelectedToCurrency}>
-                            <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">To: All</SelectItem>
-                                {availableToCurrencies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Transaction List */}
-                    {filteredData.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-14 text-muted-foreground/30 gap-3 rounded-2xl border border-dashed border-border/20">
-                            <Inbox className="size-8 opacity-30" />
-                            <p className="text-[10px] tracking-wider">NO TRANSACTIONS FOR THIS PERIOD</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-2">
-                            {filteredData.map((item) => {
-                                const isIn = item.to_currency === 'USD';
-                                const isOut = item.from_currency === 'USD';
-                                return (
-                                    <div key={item.id} className="rounded-xl border border-border/20 bg-card overflow-hidden">
-                                        <div className={cn(
-                                            'w-full h-0.5',
-                                            isIn ? 'bg-emerald-500/70' : isOut ? 'bg-rose-500/70' : 'bg-border/50'
-                                        )} />
-                                        <div className="p-4">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div>
-                                                    <div className="text-xs font-semibold text-muted-foreground">
-                                                        {new Date(item.transaction_at).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-                                                    </div>
-                                                    <div className="text-[10px] font-mono text-muted-foreground/60">
-                                                        {new Date(item.transaction_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-xs">
-                                                    <span className="font-mono font-semibold text-muted-foreground">{item.from_currency}</span>
-                                                    <ArrowRight className="size-3 text-muted-foreground/40" />
-                                                    <span className="font-mono font-semibold text-muted-foreground">{item.to_currency}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-between items-end">
-                                                <div>
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-xl font-mono font-bold text-foreground">
-                                                            {item.foreign_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </span>
-                                                        <span className="text-xs font-semibold text-muted-foreground">{item.to_currency}</span>
-                                                    </div>
-                                                    <div className="text-[11px] font-mono text-muted-foreground mt-0.5">
-                                                        @ {item.exchange_rate.toFixed(4)}
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-base font-mono font-bold text-foreground">
-                                                        {item.thb_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </div>
-                                                    <div className="text-[10px] text-muted-foreground font-semibold">THB</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                    {view === 'month' && (
+                        <div className="flex items-center justify-between bg-card rounded-2xl p-2">
+                            <Button variant="ghost" size="icon" onClick={handlePrevMonth} aria-label="Previous month">
+                                <ChevronLeft />
+                            </Button>
+                            <div className="text-center">
+                                <div className="font-semibold text-[17px]">{MONTHS[selectedMonth]}</div>
+                                <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                                    <SelectTrigger className="h-6 border-0 bg-transparent p-0 text-[13px] text-muted-foreground shadow-none focus:ring-0 w-auto mx-auto gap-1">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            {(availableYears.length > 0 ? availableYears : [new Date().getFullYear()]).map(y => (
+                                                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={handleNextMonth} aria-label="Next month">
+                                <ChevronRight />
+                            </Button>
                         </div>
                     )}
 
-                    <p className="text-center text-[9px] font-mono text-muted-foreground/30 tracking-wider pb-2">
-                        {filteredData.length} TRANSACTION{filteredData.length !== 1 ? 'S' : ''}
-                    </p>
+                    {/* Currency filters */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select value={selectedFromCurrency} onValueChange={setSelectedFromCurrency}>
+                            <SelectTrigger className="h-11 w-full" aria-label="Filter by from currency"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="All">From: All</SelectItem>
+                                    {availableFromCurrencies.map(c => <SelectItem key={c} value={c}>From: {c}</SelectItem>)}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedToCurrency} onValueChange={setSelectedToCurrency}>
+                            <SelectTrigger className="h-11 w-full" aria-label="Filter by to currency"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    <SelectItem value="All">To: All</SelectItem>
+                                    {availableToCurrencies.map(c => <SelectItem key={c} value={c}>To: {c}</SelectItem>)}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {view === 'month' ? (
+                        monthData.length === 0 ? emptyState : (
+                            <>
+                                <Group>{monthData.map(item => <FxRow key={item.id} item={item} />)}</Group>
+                                <p className="text-center text-[13px] text-muted-foreground">
+                                    {monthData.length} transaction{monthData.length !== 1 ? 's' : ''}
+                                </p>
+                            </>
+                        )
+                    ) : currencyFiltered.length === 0 ? emptyState : (
+                        <>
+                            {grouped.map(g => (
+                                <Fragment key={g.key}>
+                                    <h2 className="px-1 pt-2 -mb-2 text-[13px] font-medium text-muted-foreground">{g.label}</h2>
+                                    <Group>{g.items.map(item => <FxRow key={item.id} item={item} />)}</Group>
+                                </Fragment>
+                            ))}
+                            {visibleAll.length < currencyFiltered.length && (
+                                <Button variant="secondary" size="lg" className="w-full h-12" onClick={() => setShown(s => s + PAGE)}>
+                                    Show more ({currencyFiltered.length - visibleAll.length} left)
+                                </Button>
+                            )}
+                        </>
+                    )}
                 </>
             )}
         </div>

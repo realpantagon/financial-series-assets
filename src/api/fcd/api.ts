@@ -1,15 +1,15 @@
-import { supabase } from '../../supabaseClient';
+import { db } from '../../db';
 import type { DimeTransaction } from '../../types';
 import type { FCDEntry, FCDTxType, NewFCDEntry } from './types';
 
 export async function fetchFCDEntries(): Promise<FCDEntry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('pantagon_financial_fcd')
     .select('*')
     .order('date', { ascending: false });
 
   if (error) throw error;
-  return (data || []).map(e => ({ ...e, origin: 'manual' as const }));
+  return ((data as FCDEntry[]) || []).map(e => ({ ...e, origin: 'manual' as const }));
 }
 
 // Map a Dime gold transaction into a virtual FCD cash-flow entry.
@@ -46,7 +46,7 @@ function goldToFCDEntry(tx: DimeTransaction): FCDEntry | null {
 // Gold trades from the pipeline (MTS/YLG), as virtual USD cash flows.
 // Read from the dedicated dime_gold table (all channels: DIMEFCD + DIMESAVE).
 export async function fetchDimeCashFlows(): Promise<FCDEntry[]> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('dime_gold')
     .select('id,trade_date,side,symbol,qty,qty_unit,net_usd');
 
@@ -67,7 +67,7 @@ export async function fetchAllFCDEntries(): Promise<FCDEntry[]> {
 }
 
 export async function addFCDEntry(entry: NewFCDEntry): Promise<FCDEntry> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('pantagon_financial_fcd')
     .insert([entry])
     .select()
@@ -78,7 +78,7 @@ export async function addFCDEntry(entry: NewFCDEntry): Promise<FCDEntry> {
 }
 
 export async function updateFCDEntry(id: number, entry: Partial<NewFCDEntry>): Promise<FCDEntry> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('pantagon_financial_fcd')
     .update(entry)
     .eq('id', id)
@@ -90,7 +90,7 @@ export async function updateFCDEntry(id: number, entry: Partial<NewFCDEntry>): P
 }
 
 export async function deleteFCDEntry(id: number): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('pantagon_financial_fcd')
     .delete()
     .eq('id', id);
