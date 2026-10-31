@@ -17,8 +17,8 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       workbox: { navigateFallbackDenylist: [/^\/api\//] },
       manifest: {
-        name: 'Pan Assets',
-        short_name: 'PanAssets',
+        name: 'Finance',
+        short_name: 'Finance',
         description: 'Financial Asset Management',
         theme_color: '#121316',
         background_color: '#121316',
@@ -36,6 +36,13 @@ export default defineConfig({
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            // The logo sits inside the 80% safe zone, so Android can crop it to any shape.
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       }
