@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import { db } from '../db';
+// 96px WebP icons (each < 4KB) — Vite inlines them into the bundle, so they
+// render instantly instead of fetching the full-size originals from /public.
+import scbIcon from '@/assets/accounts/scb.webp';
+import dimeIcon from '@/assets/accounts/dime.webp';
+import kbankIcon from '@/assets/accounts/kbank.webp';
+import ttbIcon from '@/assets/accounts/ttb.webp';
+import ssoIcon from '@/assets/accounts/sso.webp';
 
 export interface FinancialAccount {
     id: number;
@@ -19,11 +26,11 @@ export interface FinancialAccount {
 export function getAccountIcon(accountName: string | null | undefined): string | undefined {
     if (!accountName) return undefined;
     const lower = accountName.toLowerCase();
-    if (lower.includes('scb')) return '/scb.jpg';
-    if (lower.includes('dime')) return '/Dime.png';
-    if (lower.includes('kbank') || lower.includes('make')) return '/kbank.png';
-    if (lower.includes('ttb')) return '/ttb.png';
-    if (lower.includes('sso')) return '/SSO.jpg';
+    if (lower.includes('scb')) return scbIcon;
+    if (lower.includes('dime')) return dimeIcon;
+    if (lower.includes('kbank') || lower.includes('make')) return kbankIcon;
+    if (lower.includes('ttb')) return ttbIcon;
+    if (lower.includes('sso')) return ssoIcon;
     return undefined;
 }
 
